@@ -16,3 +16,9 @@
 - Lines must not exceed 80 chars, truncate the line at 80 chars, and hen indent 
         twice (8 spaces)
 
+- Naming:
+    - try to prefix file names with como_*(
+    - use a noun instead of a verb for the second part of the name
+    - $PREFIX_NOUN
+    - como_executor instead of como_execute
+
