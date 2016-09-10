@@ -283,6 +283,7 @@ static void como_compile(ast_node* p, ComoFrame *frame)
                     (void *)create_op(IRETURN, newLong(1L))));           
             } 
 
+            /* All functions are inserted into the global frame, sigh */
             mapInsertEx(global_frame->cf_symtab, name, newPointer(
                 (void *)func_decl_frame));
 
@@ -401,7 +402,7 @@ static void como_compile(ast_node* p, ComoFrame *frame)
     }
 }
 
-static void como_execute(ComoFrame *frame, ComoFrame *callingframe) 
+static void como_execute(ComoFrame *frame) 
 {
     size_t i;
     for(i = 0; i < O_AVAL(frame->code)->size; i++) 
@@ -450,42 +451,42 @@ static void como_execute(ComoFrame *frame, ComoFrame *callingframe)
                 }
                 break;        
             }
-						case IS_LESS_THAN: {
-							Object *right = pop(frame);
-							Object *left = pop(frame);
-							assert(right);
-							assert(left);
+            case IS_LESS_THAN: {
+                    Object *right = pop(frame);
+                    Object *left = pop(frame);
+                    assert(right);
+                    assert(left);
 
-							if(objectValueIsLessThan(left, right)) {
-								push(frame, newLong(1L));
-							} else {
-								push(frame, newLong(0L));
-							}
-							break;
-						}
-						case IADD: {
-							Object *right = pop(frame);
-							Object *left = pop(frame);
-							assert(right);
-							assert(left);
+                    if(objectValueIsLessThan(left, right)) {
+                            push(frame, newLong(1L));
+                    } else {
+                            push(frame, newLong(0L));
+                    }
+                    break;
+            }
+            case IADD: {
+                    Object *right = pop(frame);
+                    Object *left = pop(frame);
+                    assert(right);
+                    assert(left);
 
-							if(O_TYPE(left) == IS_LONG && O_TYPE(right) == IS_LONG) {
-								long value = O_LVAL(left) + O_LVAL(right);
-								push(frame, newLong(value));
-							} else {
-								char *left_str = objectToString(left);
-								char *right_str = objectToString(right);
-								Object *s1 = newString(left_str);
-								Object *s2 = newString(right_str);
-								Object *value = stringCat(s1, s2);
-								push(frame, value);
-								objectDestroy(s1);
-								objectDestroy(s2);
-								free(left_str);
-								free(right_str);	
-							}
-							break;
-						}
+                    if(O_TYPE(left) == IS_LONG && O_TYPE(right) == IS_LONG) {
+                            long value = O_LVAL(left) + O_LVAL(right);
+                            push(frame, newLong(value));
+                    } else {
+                            char *left_str = objectToString(left);
+                            char *right_str = objectToString(right);
+                            Object *s1 = newString(left_str);
+                            Object *s2 = newString(right_str);
+                            Object *value = stringCat(s1, s2);
+                            push(frame, value);
+                            objectDestroy(s1);
+                            objectDestroy(s2);
+                            free(left_str);
+                            free(right_str);	
+                    }
+                    break;
+            }
             case IMINUS: {
                 Object *right = pop(frame);
                 Object *left = pop(frame);
@@ -496,6 +497,21 @@ static void como_execute(ComoFrame *frame, ComoFrame *callingframe)
                 } else {
                     push(frame, newLong(O_LVAL(left) - O_LVAL(right)));
                 }      
+                break;
+            }
+            case IS_GREATER_THAN_OR_EQUAL: 
+            {
+                Object *right = pop(frame);
+                Object *left = pop(frame);
+                if(objectValueIsGreaterThan(left, right)
+                        || objectValueCompare(left, right)) 
+                {
+                    push(frame, newLong(1L));
+                }
+                else
+                {
+                    push(frame, newLong(0L));
+                }
                 break;
             }
             case IS_LESS_THAN_OR_EQUAL: {
@@ -529,19 +545,18 @@ static void como_execute(ComoFrame *frame, ComoFrame *callingframe)
             case HALT: {
                 break;
             }
-						case IS_NOT_EQUAL: {
-							Object *right = pop(frame);
-							Object *left = pop(frame);
+            case IS_NOT_EQUAL: {
+                    Object *right = pop(frame);
+                    Object *left = pop(frame);
 
-							if(!objectValueCompare(left, right)) {
-								push(frame, newLong(1L));
-							} else {
-								push(frame, newLong(0L));
-							}
-							break;
-						}
+                    if(!objectValueCompare(left, right)) {
+                            push(frame, newLong(1L));
+                    } else {
+                            push(frame, newLong(0L));
+                    }
+                    break;
+            }
             case LOAD_CONST: {
-								como_debug("LOAD_CONST");
                 push(frame, opcode->operand);
                 break;
             }
@@ -551,7 +566,7 @@ static void como_execute(ComoFrame *frame, ComoFrame *callingframe)
                     O_SVAL(opcode->operand)->value, value);
                 break;
             }
-						/* This is where recursion was broken, don't do *ex */
+	    /* This is where recursion was broken, don't do *ex */
             case LOAD_NAME: {
                 Object *value = NULL;
                 value = mapSearch(frame->cf_symtab, 
@@ -617,7 +632,7 @@ load_name_leave:
 
                 //fnframe->next = prev;
 
-                como_execute(fnframe, NULL);
+                como_execute(fnframe);
                 
 								push(frame, pop(fnframe));
 								//fnframe->next = NULL;
@@ -682,7 +697,7 @@ static void como_compile_ast(ast_node *p, const char *filename) {
     
     arrayPushEx(main_code, newPointer((void *)create_op(HALT, NULL)));
 
-    (void)como_execute(global_frame, NULL);
+    (void)como_execute(global_frame);
 }
 
 char *get_active_file_name(void) {
