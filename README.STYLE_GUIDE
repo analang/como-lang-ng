@@ -1,0 +1,18 @@
+- Whitespace is to 4 spaces (not tabs)
+- Blocks are to be on a new line
+    BAD:
+        for(;;) {}
+    GOOD:
+        for(;;)
+        {
+        }
+- The pointer should be defined with the * on the name, not the type
+    BAD:
+        Frame* frame;
+    GOOD:
+        Frame *frame;
+
+- structs should have all their members visually alligned
+- Lines must not exceed 80 chars, truncate the line at 80 chars, and hen indent 
+        twice (8 spaces)
+
