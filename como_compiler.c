@@ -407,24 +407,34 @@ static void como_execute(ComoFrame *frame)
     size_t i;
     for(i = 0; i < O_AVAL(frame->code)->size; i++) 
     {
-        ComoOpCode *opcode = ((ComoOpCode *)(O_PTVAL(O_AVAL(frame->code)->table[i])));
+        ComoOpCode *opcode = ((ComoOpCode *)(O_PTVAL(O_AVAL(frame->code)
+                ->table[i])));
+        
         switch(opcode->op_code) 
         {
-            default: {
+            default: 
+            {
                 como_error_noreturn("Invalid OpCode got %d", opcode->op_code);
             }
-            case POSTFIX_INC: {
+            case POSTFIX_INC: 
+            {
                 Object *value = NULL;
                 value = mapSearchEx(frame->cf_symtab, 
                     O_SVAL(opcode->operand)->value);
 
-                if(value == NULL) {
+                if(value == NULL) 
+                {
                     como_error_noreturn("undefined variable '%s'", 
                         O_SVAL(opcode->operand)->value);
-                } else {
-                    if(O_TYPE(value) != IS_LONG) {
+                } 
+                else 
+                {
+                    if(O_TYPE(value) != IS_LONG) 
+                    {
                         como_error_noreturn("unsupported value for POSTFIX_INC");
-                    } else {
+                    } 
+                    else 
+                    {
                         long oldvalue = O_LVAL(value);
                         O_LVAL(value) = oldvalue + 1;
                         push(frame, newLong(oldvalue));
@@ -499,6 +509,18 @@ static void como_execute(ComoFrame *frame)
                 }      
                 break;
             }
+            case IREM: {
+                Object *right = pop(frame);
+                Object *left = pop(frame);
+                assert(right);
+                assert(left);
+                if(O_TYPE(left) != IS_LONG && O_TYPE(right) != IS_LONG) {
+                    como_error_noreturn("unsupported value for IREM");
+                } else {
+                    push(frame, newLong(O_LVAL(left) % O_LVAL(right)));
+                }      
+                break;
+            }
             case IS_GREATER_THAN_OR_EQUAL: 
             {
                 Object *right = pop(frame);
@@ -514,75 +536,97 @@ static void como_execute(ComoFrame *frame)
                 }
                 break;
             }
-            case IS_LESS_THAN_OR_EQUAL: {
+            case IS_LESS_THAN_OR_EQUAL: 
+            {
                 Object *right = pop(frame);
                 Object *left = pop(frame);
                 assert(right);
                 assert(left);
 
-                if(objectValueCompare(left, right) || objectValueIsLessThan(left, right)) {
+                if(objectValueCompare(left, right)
+                        || objectValueIsLessThan(left, right)) 
+                {
                     push(frame, newLong(1L));
-                } else {
+                } 
+                else 
+                {
                     push(frame, newLong(0L));
                 }
                 break;
             }
-            case JZ: {
+            case JZ: 
+            {
                 Object *cond = pop(frame);
-                if(O_TYPE(cond) == IS_LONG && O_LVAL(cond) == 0) {
+                if(O_TYPE(cond) == IS_LONG && O_LVAL(cond) == 0) 
+                {
                     i = (size_t)O_LVAL(opcode->operand);      
                     continue;          
                 }
                 break;
             }
-            case JMP: {
-                i = O_LVAL(opcode->operand);
+            case JMP: 
+            {
+                i = (size_t)O_LVAL(opcode->operand);
                 continue;
             }
-            case LABEL: {
+            case LABEL: 
+            {
                 break;
             }
-            case HALT: {
+            case HALT: 
+            {
                 break;
             }
-            case IS_NOT_EQUAL: {
-                    Object *right = pop(frame);
-                    Object *left = pop(frame);
+            case IS_NOT_EQUAL: 
+            {
+                Object *right = pop(frame);
+                Object *left = pop(frame);
 
-                    if(!objectValueCompare(left, right)) {
-                            push(frame, newLong(1L));
-                    } else {
-                            push(frame, newLong(0L));
-                    }
-                    break;
+                if(!objectValueCompare(left, right)) 
+                {
+                    push(frame, newLong(1L));
+                } 
+                else 
+                {
+                    push(frame, newLong(0L));
+                }
+                break;
             }
-            case LOAD_CONST: {
+            case LOAD_CONST: 
+            {
                 push(frame, opcode->operand);
                 break;
             }
-            case STORE_NAME: {
+            case STORE_NAME: 
+            {
                 Object *value = pop(frame);
                 mapInsertEx(frame->cf_symtab, 
                     O_SVAL(opcode->operand)->value, value);
                 break;
             }
 	    /* This is where recursion was broken, don't do *ex */
-            case LOAD_NAME: {
+            case LOAD_NAME: 
+            {
                 Object *value = NULL;
                 value = mapSearch(frame->cf_symtab, 
-                    O_SVAL(opcode->operand)->value);
-                if(value) {
-                    goto load_name_leave;
-                } else {
+                                O_SVAL(opcode->operand)->value);
+                if(value) 
+                {
+                    push(frame, value);
+                    break;
+                } 
+                else 
+                {
                     value = mapSearch(global_frame->cf_symtab, 
-                        O_SVAL(opcode->operand)->value);
+                                    O_SVAL(opcode->operand)->value);
                 }
 
-                if(value == NULL) {
+                if(value == NULL) 
+                {
                     como_error_noreturn("undefined variable '%s'", 
                         O_SVAL(opcode->operand)->value);
                 }
-load_name_leave:
+                
                 push(frame, value);
                 break;
             }

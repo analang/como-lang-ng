@@ -1,0 +1,17 @@
+func iseven(num) {
+	return num % 2 == 0;
+}
+
+func print_even(num)
+{
+	while(num) {
+		if(iseven(num)) {
+			print(num + " is even");
+		} else {
+			print(num + " is odd");
+		}
+		num = num - 1;
+	}
+}
+
+print_even(5);
