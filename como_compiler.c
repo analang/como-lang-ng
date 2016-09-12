@@ -284,7 +284,7 @@ static void como_compile(ast_node* p, ComoFrame *frame)
             } 
 
             /* All functions are inserted into the global frame, sigh */
-            mapInsertEx(global_frame->cf_symtab, name, newPointer(
+            mapInsertEx(frame->cf_symtab, name, newPointer(
                 (void *)func_decl_frame));
 
             break;
@@ -646,17 +646,6 @@ static void como_execute(ComoFrame *frame)
                         (long)(O_AVAL(fnframe->namedparameters)->size), 
                         O_LVAL(argcount));
                 }
-								//como_debug("calling '%s'", O_SVAL(opcode->operand)->value);
-                // DOING THIS ACTUALLY DEFINES THE NAME AT RUNTIME
-								// which could not be equal to that actual function body 
-								// declared
-								// name = my_function
-								// name() 
-								// that call will have "name" for value __FUNCTION__
-								// even though the real function is my_function
-								// must define it at COMPILE time
-								// mapInsertEx(fnframe->cf_symtab, "__FUNCTION__", 
-                // newString(O_SVAL(opcode->operand)->value));
 
                 while(i--) {
                     como_debug("getting %ldth argument for function call '%s'",
@@ -666,20 +655,15 @@ static void como_execute(ComoFrame *frame)
                     Object *argvalue = pop(frame);
                     mapInsert(fnframe->cf_symtab, O_SVAL(argname)->value,
                         argvalue);
-                    char *argvaluestr = objectToString(argvalue);
-                    
-										como_debug("%ldth argument: '%s' has value: %s", i, O_SVAL(argname)->value,
-                        argvaluestr);
-										free(argvaluestr);
                 }
-                //ComoFrame *prev = frame;
-
-                //fnframe->next = prev;
 
                 como_execute(fnframe);
                 
-								push(frame, pop(fnframe));
-								//fnframe->next = NULL;
+                push(frame, pop(fnframe));
+
+                /* Now, clear the symbol table */
+                objectDestroy(fnframe->cf_symtab);
+                fnframe->cf_symtab = newMap(2);
 
                 break;
             }
