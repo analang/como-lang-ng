@@ -1,8 +1,12 @@
 CFLAGS = -g -Wall -Wextra -Wunused-parameter
-LIBS = -lobject -leasyio
+LIBS = -lobject
 
-como: como_executor.o como_ast.o como_debug.o como_stack.o como_lexer.o como_parser.o como_compiler.o como.o
-	$(CC) como_executor.o como_debug.o como_ast.o como_stack.o como_parser.o como_lexer.o como_compiler.o como.o -o como $(CFLAGS) $(LIBS)
+como: como_io.o como_executor.o como_ast.o como_debug.o como_stack.o como_lexer.o como_parser.o como_compiler.o como.o
+	$(CC) como_io.o como_executor.o como_debug.o como_ast.o como_stack.o como_parser.o como_lexer.o como_compiler.o como.o -o como $(CFLAGS) $(LIBS)
+
+
+como_io.o: como_io.c
+	$(CC) $(CFLAGS) -c como_io.c
 
 como_executor.o: como_executor.c
 	$(CC) $(CFLAGS) -c como_executor.c

@@ -18,7 +18,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <easyio.h>
 #include <object.h>
 #include <assert.h>
 
@@ -30,6 +29,7 @@
 #include "como_parser.h"
 #include "como_lexer.h"
 #include "como_compiler.h"
+#include "como_io.h"
 
 static ComoFrame *global_frame = NULL;
 
@@ -756,7 +756,7 @@ int como_ast_create(const char *filename)
     YY_BUFFER_STATE state;
     char* text;
 
-    text = file_get_contents(filename);
+    text = como_read_file(filename);
 
     if(!text) {
         printf("file '%s' not found\n", filename);

@@ -17,7 +17,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <easyio.h>
 #include <object.h>
 #include <assert.h>
 
