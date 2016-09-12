@@ -18,6 +18,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include "como_debug.h"
 
