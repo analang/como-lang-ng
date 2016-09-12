@@ -23,6 +23,9 @@
 
 #include "como_io.h"
 
+/**
+ * POSIX compliant 
+ */
 char *como_read_file(const char *path)
 {
     int fd;
