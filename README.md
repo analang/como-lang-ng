@@ -41,6 +41,10 @@ func print_range(a, b) {
 }
 ```
 
+# Build Requirements
+I only compile this on UNIX like systems. You need the standard build tools
+such as `autoconf`, `libtool`, and `flex` and `bison`. Also there is a runtime
+requirement : `libobject` which you can get at https://github.com/libobject/libobject
 
 # License
 Please see the file LICENSE located in the root directory of the project.
