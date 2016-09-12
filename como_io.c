@@ -66,6 +66,7 @@ char *como_read_file(const char *path)
     if(buffer == NULL)
     {
         close(fd);
+        free(buffer);
         return NULL;
     }
 
@@ -74,6 +75,7 @@ char *como_read_file(const char *path)
     if(nread != length)
     {
         close(fd);
+        free(buffer);
         return NULL;
     }
 
@@ -83,6 +85,3 @@ char *como_read_file(const char *path)
 
     return buffer;
 }
-
-
-
