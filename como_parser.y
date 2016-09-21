@@ -42,7 +42,6 @@ typedef void* yyscan_t;
 
 }
 
-%output  "como_parser.c"
 %defines "como_parser.h"
 
 %pure-parser
