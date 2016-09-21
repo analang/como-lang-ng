@@ -1,0 +1,24 @@
+func a()
+{
+/* This function will be defined inside of a's symbol table */
+    func b()
+    {
+        return __FUNCTION__;
+    }
+
+    return b;
+}
+
+first = a();
+print(first());
+
+func ref() {
+    return __FUNCTION__;
+}
+
+_ref = ref;
+
+ref = 1;
+
+print(_ref());
+print(ref);
