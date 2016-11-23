@@ -216,6 +216,4 @@ extern void ast_node_free(ast_node *node);
 
 extern void ast_node_dump_tree(ast_node *node);
 
-extern void ast_compile(const char *filename, ast_node *program);
-
 #endif /* !COMO_AST_H */

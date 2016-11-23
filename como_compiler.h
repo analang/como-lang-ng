@@ -21,6 +21,8 @@
 #include <stddef.h>
 #include <object.h>
 
+#include "como_ast.h"
+
 #define COMO_DEFAULT_FRAME_STACKSIZE 2048U
 
 typedef struct ComoOpCode 
@@ -41,6 +43,7 @@ typedef struct ComoFrame
     Object           *filename;
 } ComoFrame;
 
-extern int como_ast_create(const char *filename);
+void como_compile_ast(ast_node *p, const char *filename);
+
 
 #endif /* !COMO_COMPILER_H */

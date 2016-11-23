@@ -20,6 +20,7 @@
 #include "como_ast.h"
 #include "como_parser.h"
 #include "como_lexer.h"
+#include "como_io.h"
 
 #define YYERROR_VERBOSE
 
@@ -34,6 +35,9 @@ int yyerror(YYLTYPE * lvalp, ast_node** ast, yyscan_t scanner, const char* msg)
 %}
 
 %code requires {
+
+extern ast_node *como_parse(const char *filename);
+
 
 #ifndef YY_TYPEDEF_YY_SCANNER_T
 #define YY_TYPEDEF_YY_SCANNER_T
@@ -308,5 +312,40 @@ expr:
 ;
 
 %%
+
+ast_node *como_parse(const char *filename)
+{
+    ast_node* statements;
+    yyscan_t scanner;
+    YY_BUFFER_STATE state;
+    char* text;
+
+    text = como_read_file(filename);
+
+    if(text == NULL) 
+    {
+        como_error_noreturn("can't open '%s'\n", filename);
+    }
+    
+    if(yylex_init(&scanner)) 
+    {
+        como_error_noreturn("error parsing file");
+    }
+
+    state = yy_scan_string(text, scanner);
+
+    if(yyparse(&statements, scanner)) 
+    {
+        como_error_noreturn("error parsing file");
+    }
+
+    yy_delete_buffer(state, scanner);
+
+    yylex_destroy(scanner);
+
+    free(text);
+
+    return statements;
+}
 
 

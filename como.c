@@ -41,5 +41,9 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    return como_ast_create(argv[1]);
+    ast_node *program = como_parse(argv[1]);
+
+    como_compile_ast(program, argv[1]);
+
+    return 0;
 }

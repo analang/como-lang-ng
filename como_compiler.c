@@ -493,7 +493,7 @@ static void como_execute(ComoFrame *frame)
                             objectDestroy(s1);
                             objectDestroy(s2);
                             free(left_str);
-                            free(right_str);	
+                            free(right_str);    
                     }
                     break;
             }
@@ -604,7 +604,7 @@ static void como_execute(ComoFrame *frame)
                     O_SVAL(opcode->operand)->value, value);
                 break;
             }
-	    /* This is where recursion was broken, don't do *ex */
+        /* This is where recursion was broken, don't do *ex */
             case LOAD_NAME: 
             {
                 Object *value = NULL;
@@ -667,23 +667,23 @@ static void como_execute(ComoFrame *frame)
 
                 break;
             }
-						case IS_EQUAL: {
-							Object *right = pop(frame);
-							Object *left = pop(frame);
-							push(frame, newLong((long)objectValueCompare(left, right)));
-							break;
-						}
+                        case IS_EQUAL: {
+                            Object *right = pop(frame);
+                            Object *left = pop(frame);
+                            push(frame, newLong((long)objectValueCompare(left, right)));
+                            break;
+                        }
             case ITIMES: {
                 Object *right = pop(frame);
                 Object *left = pop(frame);
                 assert(right);
-								assert(left);
+                                assert(left);
 
-								if(O_TYPE(right) != IS_LONG && O_TYPE(left) != IS_LONG) {
+                                if(O_TYPE(right) != IS_LONG && O_TYPE(left) != IS_LONG) {
                     como_error_noreturn("invalid operands for ITIMES");
                 }
-								como_debug("ITIMES: %d, %d", O_TYPE(left),
-											O_TYPE(right));
+                                como_debug("ITIMES: %d, %d", O_TYPE(left),
+                                            O_TYPE(right));
 
                 long value = O_LVAL(left) * O_LVAL(right);
                 push(frame, newLong(value));
@@ -691,12 +691,12 @@ static void como_execute(ComoFrame *frame)
             }
             case IRETURN: {
                 /* If there wasn't a return statement found in func body*
-								 * The compiler will insert a 1 as the operand if 
-								 * the AST had an expression for the return statement,
-								 * otherwise, it will be 0
-								 * The actual value to be returned is popped from the stack
-								 */
-								if(! (O_LVAL(opcode->operand))) {
+                                 * The compiler will insert a 1 as the operand if 
+                                 * the AST had an expression for the return statement,
+                                 * otherwise, it will be 0
+                                 * The actual value to be returned is popped from the stack
+                                 */
+                                if(! (O_LVAL(opcode->operand))) {
                     push(frame, newLong(0L));
                 }
                 return;
@@ -714,7 +714,7 @@ static void como_execute(ComoFrame *frame)
     }
 }
 
-static void como_compile_ast(ast_node *p, const char *filename) {
+static void _como_compile_ast(ast_node *p, const char *filename) {
     Object *main_code = newArray(4);
     global_frame = create_frame(main_code);
     global_frame->filename = newString(filename);
@@ -728,40 +728,12 @@ static void como_compile_ast(ast_node *p, const char *filename) {
     (void)como_execute(global_frame);
 }
 
-char *get_active_file_name(void) {
-    return "-";
-		return O_SVAL(global_frame->filename)->value;
+void como_compile_ast(ast_node *p, const char *filename) {
+    _como_compile_ast(p, filename);
 }
 
-int como_ast_create(const char *filename)
-{
-    ast_node* statements;
-    yyscan_t scanner;
-    YY_BUFFER_STATE state;
-    char* text;
 
-    text = como_read_file(filename);
-
-    if(!text) {
-        printf("file '%s' not found\n", filename);
-        return 1;
-    }
-    
-    if(yylex_init(&scanner)) {
-        como_error_noreturn("yylex_init returned NULL");
-    }
-
-    state = yy_scan_string(text, scanner);
-
-    if(yyparse(&statements, scanner)) {
-        como_error_noreturn("yyparse returned NULL");
-    }
-
-    yy_delete_buffer(state, scanner);
-
-    yylex_destroy(scanner);
-
-    como_compile_ast(statements, filename);
-
-    return 0;
+char *get_active_file_name(void) {
+    return "-";
+        return O_SVAL(global_frame->filename)->value;
 }
