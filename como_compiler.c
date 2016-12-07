@@ -422,13 +422,19 @@ static void como_execute(ComoFrame *frame)
             }
             case ITYPEOF:
             {
-                Object *right = pop(frame);
-
-                char *str = objectTypeStr(right);
-
-                push(frame, newString(str));
-
-                free(str);
+                Object *obj = pop(frame);
+            
+                /* Hack */
+                if(O_TYPE(obj) == IS_POINTER) 
+                {
+                    push(frame, newString("function"));
+                }
+                else 
+                {
+                    char *str = objectTypeStr(obj);
+                    push(frame, newString(str));
+                    free(str);
+                }
 
                 break;
             }

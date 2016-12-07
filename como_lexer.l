@@ -66,9 +66,9 @@ D   [0-9]
 "//".*\n                            ;
 
 "/*"                                BEGIN(COMMENT);                                                                                                                                                   
-<COMMENT>"/*"                       printf("%s%d\n", "Warning: multiple comments opened at line: ", yylineno);                                                                                        
+<COMMENT>"/*"                       ;                                                                                        
 <COMMENT>"*/"                       BEGIN(INITIAL);                                                                                                                                                   
-<COMMENT>"EOF"                      printf("Reached end of file while scanning comment\n");                                                                                                            
+<COMMENT>"EOF"                      ;                                                                                                            
 <COMMENT>.|"\n"                     ;
 
 "typeof"		{ return T_TYPEOF; }
