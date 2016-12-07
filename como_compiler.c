@@ -687,11 +687,6 @@ static void como_execute(ComoFrame *frame)
                 Object *right = pop(frame);
                 Object *left = pop(frame);
                 Object *value = newLong((long)objectValueCompare(left, right));
-                printf("****\n");
-                OBJECT_DUMP(right);
-                OBJECT_DUMP(left);
-                OBJECT_DUMP(value);
-                printf("****\n");
                 push(frame, value);
                 break;
             }
@@ -725,10 +720,8 @@ static void como_execute(ComoFrame *frame)
             }
             case IPRINT: {
                 Object *value = pop(frame);
-                OBJECT_DUMP(value);
                 size_t len = 0;
                 char *sval = objectToStringLength(value, &len);
-                printf("sval=%s (%zu)\n", sval, strlen(sval));
                 fprintf(stdout, "%s\n", sval);
                 fflush(stdout);
                 free(sval);
