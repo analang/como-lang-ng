@@ -103,6 +103,10 @@ static void como_compile(ast_node* p, ComoFrame *frame)
         default:
             como_error_noreturn("Invalid node type(%d)", p->type);
         break;
+        case AST_NODE_TYPE_TYPEOF:
+            como_compile(p->u1.typeof_node.expr, frame);
+            arrayPushEx(frame->code, newPointer((void *)create_op(ITYPEOF, NULL)));
+        break;
         case AST_NODE_TYPE_STRING:
             arrayPushEx(frame->code, newPointer((void *)create_op(LOAD_CONST, 
                 newString(p->u1.string_value.value)))); 
@@ -416,6 +420,18 @@ static void como_execute(ComoFrame *frame)
             {
                 como_error_noreturn("Invalid OpCode got %d", opcode->op_code);
             }
+            case ITYPEOF:
+            {
+                Object *right = pop(frame);
+
+                char *str = objectTypeStr(right);
+
+                push(frame, newString(str));
+
+                free(str);
+
+                break;
+            }
             case POSTFIX_INC: 
             {
                 Object *value = NULL;
@@ -667,12 +683,18 @@ static void como_execute(ComoFrame *frame)
 
                 break;
             }
-                        case IS_EQUAL: {
-                            Object *right = pop(frame);
-                            Object *left = pop(frame);
-                            push(frame, newLong((long)objectValueCompare(left, right)));
-                            break;
-                        }
+            case IS_EQUAL: {
+                Object *right = pop(frame);
+                Object *left = pop(frame);
+                Object *value = newLong((long)objectValueCompare(left, right));
+                printf("****\n");
+                OBJECT_DUMP(right);
+                OBJECT_DUMP(left);
+                OBJECT_DUMP(value);
+                printf("****\n");
+                push(frame, value);
+                break;
+            }
             case ITIMES: {
                 Object *right = pop(frame);
                 Object *left = pop(frame);
@@ -691,20 +713,22 @@ static void como_execute(ComoFrame *frame)
             }
             case IRETURN: {
                 /* If there wasn't a return statement found in func body*
-                                 * The compiler will insert a 1 as the operand if 
-                                 * the AST had an expression for the return statement,
-                                 * otherwise, it will be 0
-                                 * The actual value to be returned is popped from the stack
-                                 */
-                                if(! (O_LVAL(opcode->operand))) {
+                 * The compiler will insert a 1 as the operand if 
+                 * the AST had an expression for the return statement,
+                 * otherwise, it will be 0
+                 * The actual value to be returned is popped from the stack
+                 */
+                if(! (O_LVAL(opcode->operand))) {
                     push(frame, newLong(0L));
                 }
                 return;
             }
             case IPRINT: {
                 Object *value = pop(frame);
+                OBJECT_DUMP(value);
                 size_t len = 0;
                 char *sval = objectToStringLength(value, &len);
+                printf("sval=%s (%zu)\n", sval, strlen(sval));
                 fprintf(stdout, "%s\n", sval);
                 fflush(stdout);
                 free(sval);

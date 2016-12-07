@@ -45,6 +45,7 @@
 #define UNARY_MINUS                     0x18
 #define IREM                            0x19
 #define POSTFIX_DEC                     0x20
-#define COMO_OPCODE_MAX                 0x21
+#define ITYPEOF                         0x21
+#define COMO_OPCODE_MAX                 0x22
 
 #endif /* !COMO_OPCODE_H */

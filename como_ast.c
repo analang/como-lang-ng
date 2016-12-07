@@ -23,6 +23,15 @@
 #include "como_ast.h"
 #include "como_globals.h"
 
+ast_node *ast_node_create_tyepof(ast_node *expression) 
+{
+    
+    ast_node *retval = malloc(sizeof(ast_node));    
+    retval->type = AST_NODE_TYPE_TYPEOF;
+    retval->u1.typeof_node.expr = expression;
+    return retval;
+}
+
 ast_node *ast_node_create_postfix_op(ast_postfix_op_type type,
     ast_node *expression) 
 {

@@ -66,6 +66,7 @@ typedef void* yyscan_t;
 %left T_CMP
 %left T_LTE
 %left T_NEQ
+%precedence T_TYPEOF
 %left T_GTE
 %left '<'
 %left '>'
@@ -98,6 +99,7 @@ typedef void* yyscan_t;
 %token T_INC
 %token T_DEC
 %token T_FUNCTION
+%token T_TYPEOF
 
 %token <number> T_NUM
 %token <id> T_ID
@@ -309,6 +311,10 @@ expr:
  T_ID            { $$ = ast_node_create_id($1);  free($1); }
  |
  T_STR_LIT       { $$ = ast_node_create_string_literal($1); free($1); }
+  |
+ T_TYPEOF expr {
+    $$ =ast_node_create_tyepof($2);
+ }
 ;
 
 %%

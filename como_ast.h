@@ -38,6 +38,7 @@ typedef enum
     AST_NODE_TYPE_PRINT,
     AST_NODE_TYPE_UNARY_OP, 
     AST_NODE_TYPE_POSTFIX,
+    AST_NODE_TYPE_TYPEOF
 } ast_node_type;
 
 typedef enum 
@@ -148,6 +149,11 @@ typedef struct
 	ast_node *expr;	
 } ast_node_print;
 
+typedef struct 
+{
+    ast_node *expr; 
+} ast_node_typeof;
+
 struct ast_node 
 {
     ast_node_type type;
@@ -171,10 +177,13 @@ struct ast_node
         ast_node_return     return_node;
         ast_node_print      print_node;
         ast_node_postfix    postfix_node;
+        ast_node_typeof     typeof_node;
     } u1;
 };
 
 #define AST_NODE_AS_ID(p) (p)->u1.id_node.name
+
+ast_node *ast_node_create_tyepof(ast_node *expression);
 
 extern ast_node *ast_node_create_postfix_op(ast_postfix_op_type type, 
         ast_node *expression);

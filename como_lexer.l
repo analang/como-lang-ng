@@ -71,6 +71,7 @@ D   [0-9]
 <COMMENT>"EOF"                      printf("Reached end of file while scanning comment\n");                                                                                                            
 <COMMENT>.|"\n"                     ;
 
+"typeof"		{ return T_TYPEOF; }
 "if"		    { return T_IF;     }
 "else"          { return T_ELSE;   }
 "while"         { return T_WHILE;  }
