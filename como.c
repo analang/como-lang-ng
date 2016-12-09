@@ -45,5 +45,7 @@ int main(int argc, char **argv)
 
     como_compile_ast(program, argv[1]);
 
+    ast_node_free(program);
+
     return 0;
 }
