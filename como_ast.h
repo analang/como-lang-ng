@@ -183,6 +183,8 @@ struct ast_node
 
 #define AST_NODE_AS_ID(p) (p)->u1.id_node.name
 
+extern void ast_node_free(ast_node *p);
+
 ast_node *ast_node_create_tyepof(ast_node *expression);
 
 extern ast_node *ast_node_create_postfix_op(ast_postfix_op_type type, 
