@@ -352,7 +352,7 @@ extern int yylex \
 #undef YY_DECL
 #endif
 
-#line 115 "como_lexer.l"
+#line 116 "como_lexer.l"
 
 
 #line 359 "como_lexer.h"

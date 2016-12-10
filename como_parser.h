@@ -76,9 +76,10 @@ typedef void* yyscan_t;
     T_INC = 271,
     T_DEC = 272,
     T_FUNCTION = 273,
-    T_NUM = 274,
-    T_ID = 275,
-    T_STR_LIT = 276
+    T_ASSERT = 274,
+    T_NUM = 275,
+    T_ID = 276,
+    T_STR_LIT = 277
   };
 #endif
 /* Tokens.  */
@@ -99,9 +100,10 @@ typedef void* yyscan_t;
 #define T_INC 271
 #define T_DEC 272
 #define T_FUNCTION 273
-#define T_NUM 274
-#define T_ID 275
-#define T_STR_LIT 276
+#define T_ASSERT 274
+#define T_NUM 275
+#define T_ID 276
+#define T_STR_LIT 277
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
@@ -115,7 +117,7 @@ union YYSTYPE
 	char* stringliteral;
 	ast_node* ast;
 
-#line 119 "como_parser.h" /* yacc.c:1909  */
+#line 121 "como_parser.h" /* yacc.c:1909  */
 };
 # define YYSTYPE_IS_TRIVIAL 1
 # define YYSTYPE_IS_DECLARED 1

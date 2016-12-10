@@ -38,7 +38,8 @@ typedef enum
     AST_NODE_TYPE_PRINT,
     AST_NODE_TYPE_UNARY_OP, 
     AST_NODE_TYPE_POSTFIX,
-    AST_NODE_TYPE_TYPEOF
+    AST_NODE_TYPE_TYPEOF,
+    AST_NODE_TYPE_ASSERT
 } ast_node_type;
 
 typedef enum 
@@ -154,6 +155,12 @@ typedef struct
     ast_node *expr; 
 } ast_node_typeof;
 
+typedef struct 
+{
+    int lineno;
+    ast_node *expr; 
+} ast_node_assert;
+
 struct ast_node 
 {
     ast_node_type type;
@@ -178,12 +185,15 @@ struct ast_node
         ast_node_print      print_node;
         ast_node_postfix    postfix_node;
         ast_node_typeof     typeof_node;
+        ast_node_assert     assert_node;
     } u1;
 };
 
 #define AST_NODE_AS_ID(p) (p)->u1.id_node.name
 
 extern void ast_node_free(ast_node *p);
+
+ast_node *ast_node_create_assert(ast_node *expression, int lineno);
 
 ast_node *ast_node_create_tyepof(ast_node *expression);
 

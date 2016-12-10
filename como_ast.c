@@ -23,6 +23,16 @@
 #include "como_ast.h"
 #include "como_globals.h"
 
+ast_node *ast_node_create_assert(ast_node *expression, int lineno) 
+{
+    
+    ast_node *retval = malloc(sizeof(ast_node));    
+    retval->type = AST_NODE_TYPE_ASSERT;
+    retval->u1.assert_node.expr = expression;
+    retval->u1.assert_node.lineno = lineno;
+    return retval;
+}
+
 ast_node *ast_node_create_tyepof(ast_node *expression) 
 {
     

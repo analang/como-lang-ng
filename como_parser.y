@@ -100,6 +100,7 @@ typedef void* yyscan_t;
 %token T_DEC
 %token T_FUNCTION
 %token T_TYPEOF
+%token T_ASSERT
 
 %token <number> T_NUM
 %token <id> T_ID
@@ -114,7 +115,7 @@ typedef void* yyscan_t;
 %type <ast> function_decl_statement
 %type <ast> optional_argument_list argument_list argument
 %type <ast> return_statement optional_expression
-%type <ast> assignment_statement print_statement
+%type <ast> assignment_statement print_statement assert_statement
 
 %%
 
@@ -169,6 +170,12 @@ print_statement:
 	}
 ;
 
+assert_statement:
+    T_ASSERT '(' expr ')' {
+        $$ = ast_node_create_assert($3, @1.first_line);
+    }
+;
+
 return_statement:
  T_RETURN optional_expression ';' { $$ = ast_node_create_return($2); }
 ;
@@ -188,6 +195,8 @@ expression_statement:
  assignment_statement ';' { $$ = $1; }
  |
  print_statement ';' { $$ = $1; }
+ |
+ assert_statement ';' { $$ = $1; }
 ;
 
 if_statement_without_else:

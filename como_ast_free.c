@@ -10,6 +10,10 @@ void ast_node_free(ast_node *p)
 	if(!p)
 		return;
 	switch(p->type) {
+		case AST_NODE_TYPE_ASSERT:
+			ast_node_free(p->u1.assert_node.expr);
+			free(p);			
+		break;
 		case AST_NODE_TYPE_TYPEOF:
 			ast_node_free(p->u1.typeof_node.expr);
 			free(p);			

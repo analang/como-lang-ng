@@ -30,6 +30,7 @@
 #include "como_lexer.h"
 #include "como_compiler.h"
 #include "como_io.h"
+#include "como_object.h"
 
 static ComoFrame *global_frame = NULL;
 
@@ -102,6 +103,11 @@ static void como_compile(ast_node* p, ComoFrame *frame)
     {
         default:
             como_error_noreturn("Invalid node type(%d)", p->type);
+        break;
+        case AST_NODE_TYPE_ASSERT:
+            como_compile(p->u1.assert_node.expr, frame);
+            arrayPushEx(frame->code, newPointer((void *)create_op(LOAD_CONST, newLong((long)p->u1.assert_node.lineno))));      
+            arrayPushEx(frame->code, newPointer((void *)create_op(IASSERT, NULL)));           
         break;
         case AST_NODE_TYPE_TYPEOF:
             como_compile(p->u1.typeof_node.expr, frame);
@@ -419,6 +425,18 @@ static void como_execute(ComoFrame *frame)
             default: 
             {
                 como_error_noreturn("Invalid OpCode got %d", opcode->op_code);
+            }
+            case IASSERT:
+            {
+
+                Object *lineno = pop(frame);
+                Object *obj = pop(frame);
+                
+                if(!como_object_is_truthy(obj)) {
+                    como_error_noreturn("como: assertion failed on line %d\n", O_LVAL(lineno));
+                }
+
+                break;
             }
             case ITYPEOF:
             {
@@ -749,6 +767,29 @@ static void _como_compile_ast(ast_node *p, const char *filename) {
     arrayPushEx(main_code, newPointer((void *)create_op(HALT, NULL)));
 
     (void)como_execute(global_frame);
+
+    objectDestroy(global_frame->filename);
+    objectDestroy(global_frame->namedparameters);
+    objectDestroy(global_frame->cf_symtab);
+
+    size_t i;
+    for(i = 0; i < O_AVAL(main_code)->size; i++) {
+        Object *node = O_AVAL(main_code)->table[i];
+        ComoOpCode *op = (ComoOpCode *)O_PTVAL(node);
+        if(op->operand) {
+            objectDestroy(op->operand);
+        }
+
+        free(op);
+        objectDestroy(node);
+    }
+
+    /* Can't call objectSafeDestroy on main_code because it will iterate 
+       through and cause invalid frees on each element 
+     */
+    free(O_AVAL(main_code)->table);
+    free(O_AVAL(main_code));
+    free(main_code);
 }
 
 void como_compile_ast(ast_node *p, const char *filename) {

@@ -46,6 +46,7 @@
 #define IREM                            0x19
 #define POSTFIX_DEC                     0x20
 #define ITYPEOF                         0x21
-#define COMO_OPCODE_MAX                 0x22
+#define IASSERT                         0x22
+#define COMO_OPCODE_MAX                 0x23
 
 #endif /* !COMO_OPCODE_H */

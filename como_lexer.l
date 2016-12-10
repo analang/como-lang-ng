@@ -71,6 +71,7 @@ D   [0-9]
 <COMMENT>"EOF"                      ;                                                                                                            
 <COMMENT>.|"\n"                     ;
 
+"assert"        { return T_ASSERT; }
 "typeof"		{ return T_TYPEOF; }
 "if"		    { return T_IF;     }
 "else"          { return T_ELSE;   }
