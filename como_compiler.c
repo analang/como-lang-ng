@@ -446,6 +446,10 @@ static void como_execute(ComoFrame *frame)
                 if(O_TYPE(obj) == IS_POINTER) 
                 {
                     push(frame, newString("function"));
+                } 
+                else if(O_TYPE(obj) == IS_NULL) 
+                {
+                    push(frame, newString("undefined"));
                 }
                 else 
                 {
@@ -647,6 +651,7 @@ static void como_execute(ComoFrame *frame)
         /* This is where recursion was broken, don't do *ex */
             case LOAD_NAME: 
             {
+                assert(O_TYPE(opcode->operand) == IS_STRING);
                 Object *value = NULL;
                 value = mapSearch(frame->cf_symtab, 
                                 O_SVAL(opcode->operand)->value);
@@ -663,11 +668,25 @@ static void como_execute(ComoFrame *frame)
 
                 if(value == NULL) 
                 {
-                    como_error_noreturn("undefined variable '%s'", 
-                        O_SVAL(opcode->operand)->value);
+                    /* Hack */
+                    /* LOAD_NAME "identifier"
+                       TYPEOF 
+                     */
+                    assert((i + 1) < O_AVAL(frame->code)->size);
+                    ComoOpCode *next_opcode = ((ComoOpCode *)(O_PTVAL(O_AVAL(frame->code)->table[i + 1])));
+
+                    if(next_opcode->op_code == ITYPEOF) {
+                        push(frame, newNull());
+                    } else {
+                        como_error_noreturn("undefined variable '%s'", 
+                                            O_SVAL(opcode->operand)->value);
+                    }
+                } 
+                else 
+                {
+                    push(frame, value);
                 }
-                
-                push(frame, value);
+
                 break;
             }
             case CALL_FUNCTION: {
@@ -767,29 +786,6 @@ static void _como_compile_ast(ast_node *p, const char *filename) {
     arrayPushEx(main_code, newPointer((void *)create_op(HALT, NULL)));
 
     (void)como_execute(global_frame);
-
-    objectDestroy(global_frame->filename);
-    objectDestroy(global_frame->namedparameters);
-    objectDestroy(global_frame->cf_symtab);
-
-    size_t i;
-    for(i = 0; i < O_AVAL(main_code)->size; i++) {
-        Object *node = O_AVAL(main_code)->table[i];
-        ComoOpCode *op = (ComoOpCode *)O_PTVAL(node);
-        if(op->operand) {
-            objectDestroy(op->operand);
-        }
-
-        free(op);
-        objectDestroy(node);
-    }
-
-    /* Can't call objectSafeDestroy on main_code because it will iterate 
-       through and cause invalid frees on each element 
-     */
-    free(O_AVAL(main_code)->table);
-    free(O_AVAL(main_code));
-    free(main_code);
 }
 
 void como_compile_ast(ast_node *p, const char *filename) {
