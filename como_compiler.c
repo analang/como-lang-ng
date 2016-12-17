@@ -651,7 +651,6 @@ static void como_execute(ComoFrame *frame)
         /* This is where recursion was broken, don't do *ex */
             case LOAD_NAME: 
             {
-                assert(O_TYPE(opcode->operand) == IS_STRING);
                 Object *value = NULL;
                 value = mapSearch(frame->cf_symtab, 
                                 O_SVAL(opcode->operand)->value);
