@@ -345,6 +345,11 @@ static void como_compile(ast_node* p, ComoFrame *frame)
                     arrayPushEx(frame->code, newPointer(
                         (void *)create_op(UNARY_MINUS, NULL)));
                 break;
+                case AST_UNARY_NOT:
+                    como_compile(p->u1.unary_node.expr, frame);
+                    arrayPushEx(frame->code, newPointer(
+                        (void *)create_op(UNARY_NOT, NULL)));
+                break;
             }
         }
         break;
@@ -434,6 +439,21 @@ static void como_execute(ComoFrame *frame)
                 
                 if(!como_object_is_truthy(obj)) {
                     como_error_noreturn("como: assertion failed on line %d\n", O_LVAL(lineno));
+                }
+
+                break;
+            }
+            case UNARY_NOT:
+            {
+                Object *obj = pop(frame);
+
+                if(como_object_is_truthy(obj)) 
+                {
+                    push(frame, newLong(0L));
+                }
+                else
+                {
+                    push(frame, newLong(1L));
                 }
 
                 break;

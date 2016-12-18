@@ -75,6 +75,7 @@ typedef void* yyscan_t;
 %left '*'
 %left '/'
 %left '%'
+%precedence '!'
 
 %token END 0 "EOF"
 %token '-'
@@ -83,6 +84,7 @@ typedef void* yyscan_t;
 %token '/'
 %token '<'
 %token '>'
+%token '!'
 
 %token T_IF
 %token T_LTE
@@ -115,7 +117,7 @@ typedef void* yyscan_t;
 %type <ast> function_decl_statement
 %type <ast> optional_argument_list argument_list argument
 %type <ast> return_statement optional_expression
-%type <ast> assignment_statement print_statement assert_statement
+%type <ast> assignment_statement print_statement assert_statement primary_expression
 
 %%
 
@@ -197,7 +199,18 @@ expression_statement:
  print_statement ';' { $$ = $1; }
  |
  assert_statement ';' { $$ = $1; }
+ |
+ primary_expression ';' {
+  printf("got primary expression\n");
+ }
 ;
+
+primary_expression:
+  expr '[' expr ']' {
+    printf("SLOT_ACCESS");
+  }
+;
+
 
 if_statement_without_else:
  T_IF '(' expr ')' compound_statement { $$ = ast_node_create_if($3, $5, NULL); }
@@ -313,6 +326,14 @@ expr:
  |
  '-' expr {
  	$$ = ast_node_create_unary_op(AST_UNARY_OP_MINUS, $2);
+ }
+ |
+ '!' expr {
+  $$ = ast_node_create_unary_op(AST_UNARY_NOT, $2);
+ }
+ |
+ '[' ']' {
+  printf("array expression\n");
  }
  |
  T_NUM           { $$ = ast_node_create_number($1); }

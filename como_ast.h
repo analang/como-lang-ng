@@ -50,6 +50,7 @@ typedef enum
 
 typedef enum {
     AST_UNARY_OP_MINUS,
+    AST_UNARY_NOT,
 } ast_unary_op_type;
 
 typedef enum {
