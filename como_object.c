@@ -20,7 +20,8 @@
 
 int como_object_is_truthy(Object *obj)
 {
-	if(O_TYPE(obj) == IS_LONG && !O_LVAL(obj)) 
+	/* C truthiness */
+	if(O_TYPE(obj) == IS_LONG && O_LVAL(obj) == 0L) 
 	{
 		return 0;
 	} 
