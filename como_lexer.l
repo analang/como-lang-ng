@@ -87,6 +87,7 @@ D   [0-9]
 ">="            { return T_GTE;    }
 "++"            { return T_INC;    }
 "--"            { return T_DEC;    }
+"&&"            { return T_AND;    }
 
 {WHITE_SPACE}	{ /* Skipping Blanks Today */ }
 {L}{A}*         {

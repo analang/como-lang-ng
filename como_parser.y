@@ -65,6 +65,7 @@ typedef void* yyscan_t;
 
 %left T_CMP
 %left T_LTE
+%left T_AND 
 %left T_NEQ
 %precedence T_TYPEOF
 %left T_GTE
@@ -88,6 +89,7 @@ typedef void* yyscan_t;
 
 %token T_IF
 %token T_LTE
+%token T_AND
 %token T_ELSE
 %token T_WHILE
 %token T_FOR
@@ -295,6 +297,10 @@ expr:
  |
  expr T_CMP expr { 
 	$$ = ast_node_create_binary_op(AST_BINARY_OP_CMP, $1, $3);   
+ }
+ |
+ expr T_AND expr {
+  $$ = ast_node_create_binary_op(AST_BINARY_OP_AND, $1, $3);
  }
  |
  expr T_NEQ expr {

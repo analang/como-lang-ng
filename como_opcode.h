@@ -48,6 +48,7 @@
 #define ITYPEOF                         0x21
 #define IASSERT                         0x22
 #define UNARY_NOT                       0x23
-#define COMO_OPCODE_MAX                 0x24
+#define IAND                            0x24
+#define COMO_OPCODE_MAX                 0x25
 
 #endif /* !COMO_OPCODE_H */

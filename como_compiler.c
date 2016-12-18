@@ -362,6 +362,10 @@ static void como_compile(ast_node* p, ComoFrame *frame)
             }  
             switch(p->u1.binary_node.type) 
             {
+                case AST_BINARY_OP_AND:
+                    arrayPushEx(frame->code, newPointer(
+                        (void *)create_op(IAND, NULL)));
+                break;
                 case AST_BINARY_OP_REM:
                     arrayPushEx(frame->code, newPointer(
                         (void *)create_op(IREM, NULL)));
@@ -430,6 +434,22 @@ static void como_execute(ComoFrame *frame)
             default: 
             {
                 como_error_noreturn("Invalid OpCode got %d", opcode->op_code);
+            }
+            case IAND:
+            {
+                Object *obj1 = pop(frame);
+                Object *obj2 = pop(frame);
+
+                if(como_object_is_truthy(obj1) && como_object_is_truthy(obj2)) 
+                {
+                    push(frame, newLong(1L));
+                }
+                else
+                {
+                    push(frame, newLong(0L));
+                }  
+
+                break;
             }
             case IASSERT:
             {

@@ -66,6 +66,7 @@ typedef enum {
     AST_BINARY_OP_GTE,
     AST_BINARY_OP_NEQ,
     AST_BINARY_OP_REM,
+    AST_BINARY_OP_AND,
 } ast_binary_op_type;
 
 typedef struct ast_node ast_node;
