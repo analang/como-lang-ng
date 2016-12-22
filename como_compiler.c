@@ -34,6 +34,21 @@
 
 static ComoFrame *global_frame = NULL;
 
+
+static void 
+como_op_code_array_push(ComoFrame *frame, unsigned char op_code, Object *arg1) {
+    ComoOpCode *op = malloc( sizeof( ComoOpCode ) );
+
+    op->op_code = op_code;
+    op->operand = arg1;
+
+    arrayPushEx( frame->code, newPointer( (void *) op) );
+}
+
+#define como_op_code_get(frame, index) \
+    (ComoOpCode *)O_PTVAL(O_AVAL((frame)->code)->table[(index)]);
+
+
 static void push(ComoFrame *frame, Object *value)
 {
     if(frame->cf_sp >= COMO_DEFAULT_FRAME_STACKSIZE) 
@@ -94,9 +109,21 @@ static ComoFrame *create_frame(Object *code)
     return frame;
 }
 
+static Object *como_proxy_not_null_check(Object *maybe)
+{
+    if(maybe == NULL) 
+    {
+        como_error_noreturn("allocation of Object failed, exiting");
+    }
+
+    return maybe;
+}
 
 static void como_compile(ast_node* p, ComoFrame *frame)
 {
+    #define COMO_CHECKED(result) \
+        como_proxy_not_null_check((result))
+
     assert(p);
 
     switch(p->type) 
@@ -106,8 +133,12 @@ static void como_compile(ast_node* p, ComoFrame *frame)
         break;
         case AST_NODE_TYPE_ASSERT:
             como_compile(p->u1.assert_node.expr, frame);
-            arrayPushEx(frame->code, newPointer((void *)create_op(LOAD_CONST, newLong((long)p->u1.assert_node.lineno))));      
-            arrayPushEx(frame->code, newPointer((void *)create_op(IASSERT, NULL)));           
+
+            como_op_code_array_push(frame, LOAD_CONST, 
+                COMO_CHECKED(newLong((long)p->u1.assert_node.lineno)));
+
+            como_op_code_array_push(frame, IASSERT, NULL);
+
         break;
         case AST_NODE_TYPE_TYPEOF:
             como_compile(p->u1.typeof_node.expr, frame);
@@ -426,9 +457,8 @@ static void como_execute(ComoFrame *frame)
     size_t i;
     for(i = 0; i < O_AVAL(frame->code)->size; i++) 
     {
-        ComoOpCode *opcode = ((ComoOpCode *)(O_PTVAL(O_AVAL(frame->code)
-                ->table[i])));
-        
+        ComoOpCode *opcode = como_op_code_get(frame, i);
+                
         switch(opcode->op_code) 
         {
             default: 
