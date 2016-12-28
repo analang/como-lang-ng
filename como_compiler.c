@@ -131,6 +131,23 @@ static void como_compile(ast_node* p, ComoFrame *frame)
         default:
             como_error_noreturn("Invalid node type(%d)", p->type);
         break;
+        case AST_NODE_TYPE_SLOT_ACCESS:
+            como_compile(p->u1.slot_access_node.value, frame);
+            como_compile(p->u1.slot_access_node.index, frame);
+            como_op_code_array_push(frame, GET_FIELD,  NULL);
+        break;
+        case AST_NODE_TYPE_ARRAY:
+        {
+            ssize_t element_count = p->u1.array_node.elements->u1.statements_node.count;
+            while(element_count--) {
+                como_compile(p->u1.array_node.elements->u1.statements_node.statement_list[(size_t)element_count], frame);
+            }
+            /* Last value on stack has the array length */
+            como_op_code_array_push(frame, LOAD_CONST, 
+                newLong((long)(p->u1.array_node.elements->u1.statements_node.count)));
+            como_op_code_array_push(frame, CREATE_ARRAY, NULL);
+            break;
+        }
         case AST_NODE_TYPE_ASSERT:
             como_compile(p->u1.assert_node.expr, frame);
 
@@ -464,6 +481,53 @@ static void como_execute(ComoFrame *frame)
             default: 
             {
                 como_error_noreturn("Invalid OpCode got %d", opcode->op_code);
+            }
+            case GET_FIELD:
+            {
+                Object *index = pop(frame);
+                Object *value = pop(frame);
+
+                if(O_TYPE(value) != IS_STRING && O_TYPE(value) != IS_ARRAY) {
+                    como_error_noreturn("Can't get dimension value of non object\n");
+                } 
+
+                if(O_TYPE(index) == IS_LONG) {
+                    size_t lindex = (size_t)O_LVAL(index);
+
+                    if(O_TYPE(value) == IS_ARRAY) {
+                        if(lindex < O_AVAL(value)->size) {
+                            push(frame, O_AVAL(value)->table[lindex]);
+                        } else {
+                            push(frame, newNull());
+                        }
+                    } else {
+                        if(lindex < O_SVAL(value)->length) {
+                            char c[2];
+                            c[0] = O_SVAL(value)->value[lindex];
+                            c[1] = '\0';
+                            push(frame, newString(c));
+                        } else {
+                            push(frame, newNull());
+                        } 
+                    }
+                } else {
+                    como_error_noreturn("Only ints are acceptable as slot access values");
+                }
+                break;
+            }
+            case CREATE_ARRAY:
+            {
+                Object *olength = pop(frame);
+                size_t length = (size_t)O_LVAL(olength);
+                Object *array = newArray(length);
+                size_t i;
+                for(i = 0; i < length; i++) {
+                    Object *temp = pop(frame);
+                    arrayPush(array, temp);
+                }
+                push(frame, array);
+                objectDestroy(olength);
+                break;
             }
             case IAND:
             {
@@ -832,11 +896,32 @@ static void como_execute(ComoFrame *frame)
             }
             case IPRINT: {
                 Object *value = pop(frame);
-                size_t len = 0;
-                char *sval = objectToStringLength(value, &len);
-                fprintf(stdout, "%s\n", sval);
-                fflush(stdout);
-                free(sval);
+                if(O_TYPE(value) == IS_ARRAY) {
+                    (void )fputc((int)'[', stdout);
+                    Object *item;
+                    size_t len;
+                    char *sval;
+                    size_t i = 0;
+                    COMO_ARRAY_FOREACH(value, item) {
+                        len = 0;
+                        sval = objectToStringLength(item, &len);
+                        (void )fputs((const char *)sval, stdout);
+                        if(i + 1 != O_AVAL(value)->size) {
+                            (void )fputs(", ", stdout);
+                        }
+                        free(sval);
+                        i++;
+                    } COMO_ARRAY_FOREACH_END();
+                    (void )fputc((int)']', stdout);
+                    (void )fputc((int)'\n', stdout);
+                    fflush(stdout);
+                } else {
+                    size_t len = 0;
+                    char *sval = objectToStringLength(value, &len);
+                    fprintf(stdout, "%s\n", sval);
+                    fflush(stdout);
+                    free(sval);
+                }
                 break;          
             }
         }
