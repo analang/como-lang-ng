@@ -1,0 +1,5 @@
+function printArray(value) {
+  print(value);
+}
+
+printArray([1,2,3,4,"String"]);

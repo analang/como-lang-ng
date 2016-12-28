@@ -1,0 +1,9 @@
+
+array = [];
+
+
+for(i = 0; i < 5; i++) {
+  value = array[ i ];
+
+  print( typeof (array [ i ]) );
+}

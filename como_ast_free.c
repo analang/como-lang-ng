@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <assert.h>
 #include <stdio.h>
 
 #include "como_ast.h"
@@ -10,6 +11,19 @@ void ast_node_free(ast_node *p)
 	if(!p)
 		return;
 	switch(p->type) {
+		case AST_NODE_TYPE_BOOL:
+			/* Not implemented */
+			assert(0);
+		break;
+		case AST_NODE_TYPE_SLOT_ACCESS:
+			ast_node_free(p->u1.slot_access_node.value);
+			ast_node_free(p->u1.slot_access_node.index);
+			free(p);
+		break;
+		case AST_NODE_TYPE_ARRAY:
+			ast_node_free(p->u1.array_node.elements);
+			free(p);
+		break;
 		case AST_NODE_TYPE_ASSERT:
 			ast_node_free(p->u1.assert_node.expr);
 			free(p);			

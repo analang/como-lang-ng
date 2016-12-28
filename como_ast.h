@@ -39,7 +39,10 @@ typedef enum
     AST_NODE_TYPE_UNARY_OP, 
     AST_NODE_TYPE_POSTFIX,
     AST_NODE_TYPE_TYPEOF,
-    AST_NODE_TYPE_ASSERT
+    AST_NODE_TYPE_ASSERT,
+    AST_NODE_TYPE_BOOL,
+    AST_NODE_TYPE_ARRAY,
+    AST_NODE_TYPE_SLOT_ACCESS,
 } ast_node_type;
 
 typedef enum 
@@ -163,6 +166,17 @@ typedef struct
     ast_node *expr; 
 } ast_node_assert;
 
+typedef struct 
+{
+    ast_node *value;
+    ast_node *index;
+} ast_node_slot_access;
+
+typedef struct 
+{
+    ast_node *elements;
+} ast_node_type_array;
+
 struct ast_node 
 {
     ast_node_type type;
@@ -174,26 +188,32 @@ struct ast_node
             char  *value;
             size_t length;
         } string_value;
-        ast_node_id         id_node;
-        ast_node_statements statements_node;
-        ast_node_binary     binary_node;
-        ast_node_unary      unary_node;
-        ast_node_if         if_node;
-        ast_node_while      while_node;
-        ast_node_for        for_node;
-        ast_node_function   function_node;
-        ast_node_call       call_node;
-        ast_node_return     return_node;
-        ast_node_print      print_node;
-        ast_node_postfix    postfix_node;
-        ast_node_typeof     typeof_node;
-        ast_node_assert     assert_node;
+        ast_node_id          id_node;
+        ast_node_statements  statements_node;
+        ast_node_binary      binary_node;
+        ast_node_unary       unary_node;
+        ast_node_if          if_node;
+        ast_node_while       while_node;
+        ast_node_for         for_node;
+        ast_node_function    function_node;
+        ast_node_call        call_node;
+        ast_node_return      return_node;
+        ast_node_print       print_node;
+        ast_node_postfix     postfix_node;
+        ast_node_typeof      typeof_node;
+        ast_node_assert      assert_node;
+        ast_node_type_array  array_node;
+        ast_node_slot_access slot_access_node;
     } u1;
 };
 
 #define AST_NODE_AS_ID(p) (p)->u1.id_node.name
 
 extern void ast_node_free(ast_node *p);
+
+ast_node *ast_node_create_slot_access(ast_node *value, ast_node *index);
+
+ast_node *ast_node_create_array(ast_node *elements);
 
 ast_node *ast_node_create_assert(ast_node *expression, int lineno);
 

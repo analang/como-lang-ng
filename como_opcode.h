@@ -49,6 +49,8 @@
 #define IASSERT                         0x22
 #define UNARY_NOT                       0x23
 #define IAND                            0x24
-#define COMO_OPCODE_MAX                 0x25
+#define CREATE_ARRAY                    0x25
+#define GET_FIELD                       0x26
+#define COMO_OPCODE_MAX                 0x27
 
 #endif /* !COMO_OPCODE_H */

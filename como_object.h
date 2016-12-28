@@ -20,6 +20,20 @@
 
 #include <object.h>
 
-int como_object_is_truth(Object *obj);
+#define COMO__ARRAY_FOREACH(_ar) do { \
+    size_t _i; \
+    for(_i = 0; _i < O_AVAL((_ar))->size; _i++) { \
+        Object* _value = O_AVAL((_ar))->table[_i]; \
+
+#define COMO_ARRAY_FOREACH(_ar, _val) \
+    COMO__ARRAY_FOREACH(_ar) \
+    _val = _value; \
+
+#define COMO_ARRAY_FOREACH_END() \
+    } \
+} while(0)
+
+
+int como_object_is_truthy(Object *obj);
 
 #endif

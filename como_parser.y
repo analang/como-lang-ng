@@ -162,20 +162,20 @@ statement:
 ;
 
 assignment_statement:
-	T_ID '=' expr {
+	T_ID '=' primary_expression {
  		$$ = ast_node_create_binary_op(AST_BINARY_OP_ASSIGN, ast_node_create_id($1), $3); 
  		free($1); 
 	}
 ;
 
 print_statement:
-	T_PRINT '(' expr ')' {
+	T_PRINT '(' primary_expression ')' {
 		$$ = ast_node_create_print($3);
 	}
 ;
 
 assert_statement:
-    T_ASSERT '(' expr ')' {
+    T_ASSERT '(' primary_expression ')' {
         $$ = ast_node_create_assert($3, @1.first_line);
     }
 ;
@@ -185,7 +185,7 @@ return_statement:
 ;
 
 optional_expression:
- expr { $$ = $1; }
+ primary_expression { $$ = $1; }
  | %empty { $$ = NULL; }
 ;
 
@@ -194,8 +194,6 @@ compound_statement:
 ;
 
 expression_statement:
- expr ';' { $$ = $1; }
- | 
  assignment_statement ';' { $$ = $1; }
  |
  print_statement ';' { $$ = $1; }
@@ -203,19 +201,23 @@ expression_statement:
  assert_statement ';' { $$ = $1; }
  |
  primary_expression ';' {
-  printf("got primary expression\n");
+  $$ = $1;
  }
 ;
 
 primary_expression:
-  expr '[' expr ']' {
-    printf("SLOT_ACCESS");
+  expr {
+    $$ = $1;
+  }
+  |
+  primary_expression '[' primary_expression ']' {
+    $$ = ast_node_create_slot_access($1, $3);
   }
 ;
 
 
 if_statement_without_else:
- T_IF '(' expr ')' compound_statement { $$ = ast_node_create_if($3, $5, NULL); }
+ T_IF '(' primary_expression ')' compound_statement { $$ = ast_node_create_if($3, $5, NULL); }
 ;
 
 selection_statement:
@@ -223,11 +225,11 @@ selection_statement:
  |
  if_statement_without_else T_ELSE compound_statement { $1->u1.if_node.b2 = $3; $$ = $1; }
  |
- T_WHILE '(' expr ')' compound_statement {
+ T_WHILE '(' primary_expression ')' compound_statement {
  	$$ = ast_node_create_while($3, $5);
  }
  |
- T_FOR '(' assignment_statement ';' expr ';' expr ')' compound_statement {
+ T_FOR '(' assignment_statement ';' primary_expression ';' primary_expression ')' compound_statement {
  	$$ = ast_node_create_for($3, $5, $7, $9);
  }
 ;
@@ -268,7 +270,7 @@ argument_list:
 ;
 
 argument:
- expr { $$ = $1; }
+ primary_expression { $$ = $1; }
 ;
 
  
@@ -338,8 +340,8 @@ expr:
   $$ = ast_node_create_unary_op(AST_UNARY_NOT, $2);
  }
  |
- '[' ']' {
-  printf("array expression\n");
+ '[' optional_argument_list ']' {
+    $$ = ast_node_create_array($2);
  }
  |
  T_NUM           { $$ = ast_node_create_number($1); }
@@ -348,7 +350,7 @@ expr:
  |
  T_STR_LIT       { $$ = ast_node_create_string_literal($1); free($1); }
   |
- T_TYPEOF expr {
+ T_TYPEOF primary_expression {
     $$ =ast_node_create_tyepof($2);
  }
 ;

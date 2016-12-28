@@ -23,6 +23,23 @@
 #include "como_ast.h"
 #include "como_globals.h"
 
+ast_node *ast_node_create_slot_access(ast_node *value, ast_node *index)
+{
+    ast_node *retval = malloc(sizeof(ast_node));    
+    retval->type = AST_NODE_TYPE_SLOT_ACCESS;
+    retval->u1.slot_access_node.value = value;
+    retval->u1.slot_access_node.index = index;
+    return retval;
+}
+
+ast_node *ast_node_create_array(ast_node *elements)
+{
+    ast_node *retval = malloc(sizeof(ast_node));    
+    retval->type = AST_NODE_TYPE_ARRAY;
+    retval->u1.array_node.elements = elements;
+    return retval;
+}
+
 ast_node *ast_node_create_assert(ast_node *expression, int lineno) 
 {
     
