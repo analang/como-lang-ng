@@ -177,11 +177,11 @@ static void _como_asm_dump(FILE *fp, ComoFrame *frame)
             }
             case POSTFIX_INC: 
             {
-                COMO_TRACE1(POSTFIX_INC);
+                COMO_TRACEVAR(POSTFIX_INC, "%s", O_SVAL(opcode->operand)->value);
                 break;        
             }
             case POSTFIX_DEC: {
-                COMO_TRACE1(POSTFIX_DEC);
+                COMO_TRACEVAR(POSTFIX_DEC, "%s", O_SVAL(opcode->operand)->value);
                 break;        
             }
             case IS_LESS_THAN: {
