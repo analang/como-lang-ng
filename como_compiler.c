@@ -654,6 +654,18 @@ static void como_execute(ComoFrame *frame)
             {
                 como_error_noreturn("Invalid OpCode got %d", opcode->op_code);
             }
+            case UNARY_MINUS:
+            {
+                Object *value = pop(frame);
+
+                if(O_TYPE(value) != IS_LONG) {
+                    como_error_noreturn("UNARY_MINUS can only be used on ints");
+                }
+
+                push(frame, newLong(-O_LVAL(value)));
+
+                break;
+            }
             case GET_FIELD:
             {
                 
@@ -665,16 +677,16 @@ static void como_execute(ComoFrame *frame)
                 } 
 
                 if(O_TYPE(index) == IS_LONG) {
-                    size_t lindex = (size_t)O_LVAL(index);
+                    long lindex = (long)O_LVAL(index);
 
                     if(O_TYPE(value) == IS_ARRAY) {
-                        if(lindex < O_AVAL(value)->size) {
+                        if(lindex > 0 && lindex < (long)O_AVAL(value)->size) {
                             push(frame, O_AVAL(value)->table[lindex]);
                         } else {
                             push(frame, newNull());
                         }
                     } else {
-                        if(lindex < O_SVAL(value)->length) {
+                        if(lindex > 0 && lindex < (long)O_SVAL(value)->length) {
                             char c[2];
                             c[0] = O_SVAL(value)->value[lindex];
                             c[1] = '\0';
@@ -692,7 +704,7 @@ static void como_execute(ComoFrame *frame)
             {
                 Object *olength = pop(frame);
                 size_t length = (size_t)O_LVAL(olength);
-                Object *array = newArray(length);
+                Object *array = newArray(length == 0 ? 2 : length);
                 size_t i;
                 for(i = 0; i < length; i++) {
                     Object *temp = pop(frame);
