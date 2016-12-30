@@ -91,3 +91,6 @@ for(i = 5; i >= 0; i--)
 25      LABEL
 26      HALT
 ```
+
+# Problems
+- There is no `continue`, or `break` statements in loops at this time. The first idea that comes to mind to implement this is to have the executor keep track if the VM is in a loop and store the correct JMP address. This is on the roadmap for 2017
