@@ -48,3 +48,46 @@ requirement : `libobject` which you can get at https://github.com/libobject/libo
 
 # License
 Please see the file LICENSE located in the root directory of the project.
+
+
+# Virtual Machine
+The compiler generates instructions of the custom instruction set (como_opcode.h) The virtual machine is stack based and only a few instructions take operands. Most instructions pop there arguments from the stack. Here is the relevant source code and instruction output generated from the compiler. This was run with the following command: `./como --print-asm test/for_loop`
+
+```
+for(i = 5; i >= 0; i--)
+{
+  if(i % 2 == 0) {
+    print(i);
+  }
+}
+```
+
+```
+0       LABEL
+1       LOAD_CONST 5
+2       STORE_NAME i
+3       LOAD_NAME i
+4       LOAD_CONST 0
+5       IS_GREATER_THAN_OR_EQUAL
+6       JZ 25
+7       LABEL
+8       LOAD_NAME i
+9       LOAD_CONST 2
+10      IREM
+11      LOAD_CONST 0
+12      IS_EQUAL
+13      JZ 17
+14      LOAD_NAME i
+15      IPRINT
+16      JMP 18
+17      LABEL
+18      LABEL
+19      POSTFIX_DEC
+20      LOAD_NAME i
+21      LOAD_CONST 0
+22      IS_GREATER_THAN_OR_EQUAL
+23      JZ 25
+24      JMP 7
+25      LABEL
+26      HALT
+```
