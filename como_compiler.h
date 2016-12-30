@@ -44,6 +44,6 @@ typedef struct ComoFrame
 } ComoFrame;
 
 void como_compile_ast(ast_node *p, const char *filename);
-
+void como_dump_asm(ast_node *p, const char *filename);
 
 #endif /* !COMO_COMPILER_H */

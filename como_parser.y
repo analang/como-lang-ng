@@ -350,7 +350,7 @@ expr:
  |
  T_STR_LIT       { $$ = ast_node_create_string_literal($1); free($1); }
   |
- T_TYPEOF primary_expression {
+ T_TYPEOF expr {
     $$ =ast_node_create_tyepof($2);
  }
 ;

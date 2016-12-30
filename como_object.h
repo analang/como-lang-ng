@@ -20,6 +20,10 @@
 
 #include <object.h>
 
+typedef struct ComoBuiltinFunction {
+    Object *(*handler)(Object *);
+} ComoBuiltinFunction;
+
 #define COMO__ARRAY_FOREACH(_ar) do { \
     size_t _i; \
     for(_i = 0; _i < O_AVAL((_ar))->size; _i++) { \

@@ -20,6 +20,10 @@
 
 #include <stdarg.h>
 
+#ifdef COMO_DEBUG
+#define COMO_HAVE_DEBUG 1
+#endif
+
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
 #define ANSI_COLOR_YELLOW  "\x1b[33m"
@@ -37,8 +41,12 @@ void __attribute__ ((noreturn)) como_error_noreturn_ex(const char *f,
 #define como_error_noreturn(format, ...) \
     como_error_noreturn_ex(__FILE__, __func__, __LINE__, format, ##__VA_ARGS__)  
 
+#ifdef COMO_HAVE_DEBUG
 #define como_debug(format, ...) \
         como_debug_ex(__FILE__, __func__, __LINE__, format, ##__VA_ARGS__)
+#else
+#define como_debug(format, ...)
+#endif
 
 #define COMO_OOM() do { \
 	como_error_noreturn("out of memory"); \

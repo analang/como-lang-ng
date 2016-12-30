@@ -34,6 +34,7 @@
 
 static ComoFrame *global_frame = NULL;
 
+static void _como_asm_dump(FILE *fp, ComoFrame *frame);
 
 static void 
 como_op_code_array_push(ComoFrame *frame, unsigned char op_code, Object *arg1) {
@@ -117,6 +118,163 @@ static Object *como_proxy_not_null_check(Object *maybe)
     }
 
     return maybe;
+}
+
+#define COMO_TRACE1(x) fprintf(stderr, "%s\n", #x)
+#define COMO_TRACEVAR(x, fmt, ...) do { \
+        fprintf(stderr, "%s ", #x); \
+        fprintf(stderr, fmt, ##__VA_ARGS__); \
+        fprintf(stderr, "\n"); \
+        fflush(stderr); \
+} while(0)
+
+static void _como_asm_dump(FILE *fp, ComoFrame *frame) 
+{
+    (void)fp;
+
+    size_t i;
+    for(i = 0; i < O_AVAL(frame->code)->size; i++) 
+    {
+        fprintf(stderr, "%zu\t", i);
+
+        ComoOpCode *opcode = como_op_code_get(frame, i);
+                
+        switch(opcode->op_code) 
+        {
+            default: 
+            {
+                como_error_noreturn("Invalid OpCode got %d", opcode->op_code);
+            }
+            case GET_FIELD:
+            {
+                COMO_TRACE1(GET_FIELD);
+                break;
+            }
+            case CREATE_ARRAY:
+            {
+                COMO_TRACE1(CREATE_ARRAY);
+                break;
+            }
+            case IAND:
+            {
+                COMO_TRACE1(IAND);
+                break;
+            }
+            case IASSERT:
+            {
+                COMO_TRACE1(IASSERT);
+                break;
+            }
+            case UNARY_NOT:
+            {
+                COMO_TRACE1(UNARY_NOT);
+                break;
+            }
+            case ITYPEOF:
+            {
+                COMO_TRACE1(ITYPEOF);
+                break;
+            }
+            case POSTFIX_INC: 
+            {
+                COMO_TRACE1(POSTFIX_INC);
+                break;        
+            }
+            case POSTFIX_DEC: {
+                COMO_TRACE1(POSTFIX_DEC);
+                break;        
+            }
+            case IS_LESS_THAN: {
+                COMO_TRACE1(IS_LESS_THAN);
+                break;
+            }
+            case IADD: {
+                COMO_TRACE1(IADD);
+                break;
+            }
+            case IMINUS: {
+                COMO_TRACE1(IMINUS);     
+                break;
+            }
+            case IREM: {
+                COMO_TRACE1(IREM);      
+                break;
+            }
+            case IS_GREATER_THAN_OR_EQUAL: 
+            {
+                COMO_TRACE1(IS_GREATER_THAN_OR_EQUAL);
+                break;
+            }
+            case IS_LESS_THAN_OR_EQUAL: 
+            {
+                COMO_TRACE1(IS_LESS_THAN_OR_EQUAL);
+                break;
+            }
+            case JZ: 
+            {
+                COMO_TRACEVAR(JZ, "%ld", O_LVAL(opcode->operand));
+                break;
+            }
+            case JMP: 
+            {
+                COMO_TRACEVAR(JMP, "%ld", O_LVAL(opcode->operand));
+                break;
+            }
+            case LABEL: 
+            {
+                COMO_TRACE1(LABEL);
+                break;
+            }
+            case HALT: 
+            {
+                COMO_TRACE1(HALT);
+                break;
+            }
+            case IS_NOT_EQUAL: 
+            {
+                COMO_TRACE1(IS_NOT_EQUAL);
+                break;
+            }
+            case LOAD_CONST: 
+            {
+                char *sval = objectToString(opcode->operand);
+                COMO_TRACEVAR(LOAD_CONST, "%s", sval);
+                free(sval);
+                break;
+            }
+            case STORE_NAME: 
+            {
+                COMO_TRACEVAR(STORE_NAME, "%s", O_SVAL(opcode->operand)->value);
+                break;
+            }
+        /* This is where recursion was broken, don't do *ex */
+            case LOAD_NAME: 
+            {
+                COMO_TRACEVAR(LOAD_NAME, "%s", O_SVAL(opcode->operand)->value);
+                break;
+            }
+            case CALL_FUNCTION: {
+                COMO_TRACE1(CALL_FUNCTION);
+                break;
+            }
+            case IS_EQUAL: {
+                COMO_TRACE1(IS_EQUAL);
+                break;
+            }
+            case ITIMES: {
+                COMO_TRACE1(ITIMES);
+                break;
+            }
+            case IRETURN: {
+                COMO_TRACEVAR(IRETURN, "%ld", O_LVAL(opcode->operand));
+                break;
+            }
+            case IPRINT: {
+                COMO_TRACE1(IPRINT);
+                break;          
+            }
+        }
+    }
 }
 
 static void como_compile(ast_node* p, ComoFrame *frame)
@@ -342,7 +500,7 @@ static void como_compile(ast_node* p, ComoFrame *frame)
             } 
 
             /* All functions are inserted into the global frame, sigh */
-            mapInsertEx(frame->cf_symtab, name, newPointer(
+            mapInsert(frame->cf_symtab, name, newPointer(
                 (void *)func_decl_frame));
 
             break;
@@ -469,6 +627,20 @@ static void como_compile(ast_node* p, ComoFrame *frame)
     }
 }
 
+static Object *builtin_len(Object *args) 
+{   
+
+    Object *value = O_AVAL(args)->table[ 0 ];
+
+    if(O_TYPE(value) == IS_ARRAY)
+        return newLong((long)O_AVAL(value)->size);
+    else if(O_TYPE(value) == IS_STRING)
+        return newLong((long)O_SVAL(value)->length);
+    else
+        return newLong(0L);
+}
+
+
 static void como_execute(ComoFrame *frame) 
 {
     size_t i;
@@ -484,6 +656,7 @@ static void como_execute(ComoFrame *frame)
             }
             case GET_FIELD:
             {
+                
                 Object *index = pop(frame);
                 Object *value = pop(frame);
 
@@ -531,6 +704,7 @@ static void como_execute(ComoFrame *frame)
             }
             case IAND:
             {
+
                 Object *obj1 = pop(frame);
                 Object *obj2 = pop(frame);
 
@@ -559,6 +733,7 @@ static void como_execute(ComoFrame *frame)
             }
             case UNARY_NOT:
             {
+
                 Object *obj = pop(frame);
 
                 if(como_object_is_truthy(obj)) 
@@ -574,6 +749,7 @@ static void como_execute(ComoFrame *frame)
             }
             case ITYPEOF:
             {
+
                 Object *obj = pop(frame);
             
                 /* Hack */
@@ -596,6 +772,7 @@ static void como_execute(ComoFrame *frame)
             }
             case POSTFIX_INC: 
             {
+
                 Object *value = NULL;
                 value = mapSearchEx(frame->cf_symtab, 
                     O_SVAL(opcode->operand)->value);
@@ -640,40 +817,41 @@ static void como_execute(ComoFrame *frame)
                 break;        
             }
             case IS_LESS_THAN: {
-                    Object *right = pop(frame);
-                    Object *left = pop(frame);
-                    assert(right);
-                    assert(left);
+                Object *right = pop(frame);
+                Object *left = pop(frame);
+                assert(right);
+                assert(left);
 
-                    if(objectValueIsLessThan(left, right)) {
-                            push(frame, newLong(1L));
-                    } else {
-                            push(frame, newLong(0L));
-                    }
-                    break;
+                if(objectValueIsLessThan(left, right)) {
+                    push(frame, newLong(1L));
+                } else {
+                    push(frame, newLong(0L));
+                }
+                break;
             }
             case IADD: {
-                    Object *right = pop(frame);
-                    Object *left = pop(frame);
-                    assert(right);
-                    assert(left);
 
-                    if(O_TYPE(left) == IS_LONG && O_TYPE(right) == IS_LONG) {
-                            long value = O_LVAL(left) + O_LVAL(right);
-                            push(frame, newLong(value));
-                    } else {
-                            char *left_str = objectToString(left);
-                            char *right_str = objectToString(right);
-                            Object *s1 = newString(left_str);
-                            Object *s2 = newString(right_str);
-                            Object *value = stringCat(s1, s2);
-                            push(frame, value);
-                            objectDestroy(s1);
-                            objectDestroy(s2);
-                            free(left_str);
-                            free(right_str);    
-                    }
-                    break;
+                Object *right = pop(frame);
+                Object *left = pop(frame);
+                assert(right);
+                assert(left);
+
+                if(O_TYPE(left) == IS_LONG && O_TYPE(right) == IS_LONG) {
+                    long value = O_LVAL(left) + O_LVAL(right);
+                    push(frame, newLong(value));
+                } else {
+                    char *left_str = objectToString(left);
+                    char *right_str = objectToString(right);
+                    Object *s1 = newString(left_str);
+                    Object *s2 = newString(right_str);
+                    Object *value = stringCat(s1, s2);
+                    push(frame, value);
+                    objectDestroy(s1);
+                    objectDestroy(s2);
+                    free(left_str);
+                    free(right_str);    
+                }
+                break;
             }
             case IMINUS: {
                 Object *right = pop(frame);
@@ -827,36 +1005,45 @@ static void como_execute(ComoFrame *frame)
                 Object *argcount = pop(frame);
                 long i = O_LVAL(argcount);
                 ComoFrame *fnframe;
-                if(O_TYPE(fn) != IS_POINTER) {
+
+                if(O_TYPE(fn) != IS_POINTER && O_TYPE(fn) != IS_FUNCTION) {
                     como_error_noreturn("name '%s' is not callable",
                         O_SVAL(opcode->operand)->value);
                 }
-                fnframe = (ComoFrame *)O_PTVAL(fn);
-                if(O_LVAL(argcount) != (long)(O_AVAL(fnframe->namedparameters)->size)) {
-                    como_error_noreturn("callable '%s' expects %ld arguments, but %ld were given",
-                        O_SVAL(opcode->operand)->value, 
-                        (long)(O_AVAL(fnframe->namedparameters)->size), 
-                        O_LVAL(argcount));
-                }
-
-                while(i--) {
-                    como_debug("getting %ldth argument for function call '%s'",
-                        i, O_SVAL(opcode->operand)->value);
-                    Object *argname = O_AVAL(fnframe->namedparameters)->table[i];
-
-                    Object *argvalue = pop(frame);
-                    mapInsert(fnframe->cf_symtab, O_SVAL(argname)->value,
-                        argvalue);
-                }
-
-                como_execute(fnframe);
                 
-                push(frame, pop(fnframe));
+                if(O_TYPE(fn) == IS_FUNCTION) {
+                    Object *args = newArray((size_t)i);
+                    ComoBuiltinFunction *builtin = (ComoBuiltinFunction *)O_FVAL(fn);
+                    while(i--) {
+                        Object *argvalue = pop(frame);
+                        arrayPush(args, argvalue);
+                    }
+                    Object *retval = builtin->handler(args);
+                    push(frame, retval);
+                } else {
+                    fnframe = (ComoFrame *)O_PTVAL(fn);
+                    if(O_LVAL(argcount) != (long)(O_AVAL(fnframe->namedparameters)->size)) {
+                        como_error_noreturn("callable '%s' expects %ld arguments, but %ld were given",
+                            O_SVAL(opcode->operand)->value, (long)(O_AVAL(fnframe->namedparameters)->size), 
+                            O_LVAL(argcount));
+                    }
 
-                /* Now, clear the symbol table */
-                objectDestroy(fnframe->cf_symtab);
-                fnframe->cf_symtab = newMap(2);
+                    while(i--) {
+                        Object *argname = O_AVAL(fnframe->namedparameters)->table[i];
 
+                        Object *argvalue = pop(frame);
+                        mapInsert(fnframe->cf_symtab, O_SVAL(argname)->value,
+                            argvalue);
+                    }
+
+                    como_execute(fnframe);
+                    
+                    push(frame, pop(fnframe));
+
+                    /* Now, clear the symbol table */
+                    //objectDestroy(fnframe->cf_symtab);
+                    //fnframe->cf_symtab = newMap(2);
+                }
                 break;
             }
             case IS_EQUAL: {
@@ -869,20 +1056,17 @@ static void como_execute(ComoFrame *frame)
             case ITIMES: {
                 Object *right = pop(frame);
                 Object *left = pop(frame);
-                assert(right);
-                                assert(left);
 
-                                if(O_TYPE(right) != IS_LONG && O_TYPE(left) != IS_LONG) {
+                if(O_TYPE(right) != IS_LONG && O_TYPE(left) != IS_LONG) {
                     como_error_noreturn("invalid operands for ITIMES");
                 }
-                                como_debug("ITIMES: %d, %d", O_TYPE(left),
-                                            O_TYPE(right));
 
                 long value = O_LVAL(left) * O_LVAL(right);
                 push(frame, newLong(value));
                 break;
             }
             case IRETURN: {
+
                 /* If there wasn't a return statement found in func body*
                  * The compiler will insert a 1 as the operand if 
                  * the AST had an expression for the return statement,
@@ -928,22 +1112,35 @@ static void como_execute(ComoFrame *frame)
     }
 }
 
-static void _como_compile_ast(ast_node *p, const char *filename) {
+
+static void _como_compile_ast(ast_node *p, const char *filename, int dump_asm) {
     Object *main_code = newArray(4);
     global_frame = create_frame(main_code);
     global_frame->filename = newString(filename);
     mapInsertEx(global_frame->cf_symtab, "__FUNCTION__", 
         newString("__main__"));
 
+    ComoBuiltinFunction len_function;
+    len_function.handler = builtin_len;
+
+    mapInsertEx(global_frame->cf_symtab, "len", newFunction((void *)&len_function));
+
     (void)como_compile(p, global_frame);
     
     arrayPushEx(main_code, newPointer((void *)create_op(HALT, NULL)));
 
-    (void)como_execute(global_frame);
+    if(!dump_asm)
+        (void)como_execute(global_frame);
+    else
+        _como_asm_dump(stdout, global_frame);
+}
+
+void como_dump_asm(ast_node *p, const char *filename) {
+    _como_compile_ast(p, filename, 1);
 }
 
 void como_compile_ast(ast_node *p, const char *filename) {
-    _como_compile_ast(p, filename);
+    _como_compile_ast(p, filename, 0);
 }
 
 
