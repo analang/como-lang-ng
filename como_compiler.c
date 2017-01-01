@@ -680,13 +680,13 @@ static void como_execute(ComoFrame *frame)
                     long lindex = (long)O_LVAL(index);
 
                     if(O_TYPE(value) == IS_ARRAY) {
-                        if(lindex > 0 && lindex < (long)O_AVAL(value)->size) {
+                        if(lindex >= 0 && lindex < (long)O_AVAL(value)->size) {
                             push(frame, O_AVAL(value)->table[lindex]);
                         } else {
                             push(frame, newNull());
                         }
                     } else {
-                        if(lindex > 0 && lindex < (long)O_SVAL(value)->length) {
+                        if(lindex >= 0 && lindex < (long)O_SVAL(value)->length) {
                             char c[2];
                             c[0] = O_SVAL(value)->value[lindex];
                             c[1] = '\0';
@@ -703,6 +703,9 @@ static void como_execute(ComoFrame *frame)
             case CREATE_ARRAY:
             {
                 Object *olength = pop(frame);
+
+                assert(O_TYPE(olength) == IS_LONG);
+
                 size_t length = (size_t)O_LVAL(olength);
                 Object *array = newArray(length == 0 ? 2 : length);
                 size_t i;
@@ -711,7 +714,6 @@ static void como_execute(ComoFrame *frame)
                     arrayPush(array, temp);
                 }
                 push(frame, array);
-                objectDestroy(olength);
                 break;
             }
             case IAND:
@@ -870,7 +872,7 @@ static void como_execute(ComoFrame *frame)
                 Object *left = pop(frame);
                 assert(right);
                 assert(left);
-                if(O_TYPE(left) != IS_LONG && O_TYPE(right) != IS_LONG) {
+                if(! (O_TYPE(left) == IS_LONG && O_TYPE(right) == IS_LONG)) {
                     como_error_noreturn("unsupported value for IMINUS");
                 } else {
                     push(frame, newLong(O_LVAL(left) - O_LVAL(right)));
@@ -1158,5 +1160,5 @@ void como_compile_ast(ast_node *p, const char *filename) {
 
 char *get_active_file_name(void) {
     return "-";
-        return O_SVAL(global_frame->filename)->value;
+    return O_SVAL(global_frame->filename)->value;
 }

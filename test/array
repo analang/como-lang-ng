@@ -1,3 +1,8 @@
-a[0];
-[];
-b = [];
+function getArray() {
+  a = [1,2,3];
+  return a;
+}
+
+print(
+  getArray()[len(getArray()) - 1]
+);
