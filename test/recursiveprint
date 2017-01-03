@@ -1,23 +1,44 @@
-names = [
-  "Bar",
-  [ 
-    10, 20, 30, 40, 50
-  ],
-  "Foo", "This", "IS", "A", "Test"
-];
-
 function recursive_print(value, indent) {
   if(typeof value == "array") {
-    for(i = 0; i < len(value); i++) {
-      for(x = 0; x < indent; x++) {
-        write(" ");
-      }
-      recursive_print(value[i], i + 1);
+    for(x = 0; x < indent; x++) {
+      write("  ");
     }
+    print("["); 
+    for(i = 0; i < len(value); i++) {
+      recursive_print(value[i], indent + 1);
+    }
+    for(x = 0; x < indent; x++) {
+      write("  ");
+    }
+    print("]");
   } else {
-    write(value);
+    for(x = 0; x < indent; x++) {
+      write("  ");
+    }
+    if(typeof value == "string") {
+      write("'");
+      write(value);
+      write("'");
+    } else {
+      write(value);
+    }
     print("");
   } 
 }
 
-recursive_print(names, 0);
+function pretty_print(object) {
+  recursive_print(object, 0);
+}
+
+names = [
+  "Bar",
+  [ 
+    10, 20, 30, 40, 50, 
+    [
+      "Hello", 
+      "World"
+    ]
+  ]
+];
+
+pretty_print(names);
