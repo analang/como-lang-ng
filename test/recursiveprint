@@ -6,19 +6,18 @@ names = [
   "Foo", "This", "IS", "A", "Test"
 ];
 
-function recursive_print(value) {
-  type = typeof value;
-  regular = value;
-  if(type == "array") {
-    copied = value;
-    i = 0;
-    while(i < len(copied)) {
-      recursive_print(copied[i]);
-      i = i + 1;
+function recursive_print(value, indent) {
+  if(typeof value == "array") {
+    for(i = 0; i < len(value); i++) {
+      for(x = 0; x < indent; x++) {
+        write(" ");
+      }
+      recursive_print(value[i], i + 1);
     }
   } else {
-    print(regular);
+    write(value);
+    print("");
   } 
 }
 
-recursive_print(names);
+recursive_print(names, 0);
