@@ -1,0 +1,24 @@
+names = [
+  "Bar",
+  [ 
+    10, 20, 30, 40, 50
+  ],
+  "Foo", "This", "IS", "A", "Test"
+];
+
+function recursive_print(value) {
+  type = typeof value;
+  regular = value;
+  if(type == "array") {
+    copied = value;
+    i = 0;
+    while(i < len(copied)) {
+      recursive_print(copied[i]);
+      i = i + 1;
+    }
+  } else {
+    print(regular);
+  } 
+}
+
+recursive_print(names);

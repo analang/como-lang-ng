@@ -718,7 +718,6 @@ static void como_execute(ComoFrame *frame)
             }
             case IAND:
             {
-
                 Object *obj1 = pop(frame);
                 Object *obj2 = pop(frame);
 
@@ -970,7 +969,7 @@ static void como_execute(ComoFrame *frame)
             case STORE_NAME: 
             {
                 Object *value = pop(frame);
-                mapInsertEx(frame->cf_symtab, 
+                mapInsert(frame->cf_symtab, 
                     O_SVAL(opcode->operand)->value, value);
                 break;
             }
@@ -1003,7 +1002,7 @@ static void como_execute(ComoFrame *frame)
                     if(next_opcode->op_code == ITYPEOF) {
                         push(frame, newNull());
                     } else {
-                        como_error_noreturn("undefined variable '%s'", 
+                        como_error_noreturn("LOAD_NAME: undefined variable '%s'", 
                                             O_SVAL(opcode->operand)->value);
                     }
                 } 
@@ -1036,12 +1035,20 @@ static void como_execute(ComoFrame *frame)
                     push(frame, retval);
                 } else {
                     fnframe = (ComoFrame *)O_PTVAL(fn);
+                    /* 1/2
+                     * 
+                     * What is happening here?
+                     *
+                     * If this is a recursive call, we need to save the state of the current symbol table so we don't
+                     * lose it upon a call to itself
+                     */
+                     Object *old_sym_tab = copyObject(fnframe->cf_symtab);
+
                     if(O_LVAL(argcount) != (long)(O_AVAL(fnframe->namedparameters)->size)) {
                         como_error_noreturn("callable '%s' expects %ld arguments, but %ld were given",
                             O_SVAL(opcode->operand)->value, (long)(O_AVAL(fnframe->namedparameters)->size), 
                             O_LVAL(argcount));
                     }
-
                     while(i--) {
                         Object *argname = O_AVAL(fnframe->namedparameters)->table[i];
 
@@ -1051,12 +1058,14 @@ static void como_execute(ComoFrame *frame)
                     }
 
                     como_execute(fnframe);
-                    
-                    push(frame, pop(fnframe));
 
-                    /* Now, clear the symbol table */
-                    //objectDestroy(fnframe->cf_symtab);
-                    //fnframe->cf_symtab = newMap(2);
+                    push(frame, pop(fnframe));    
+
+                    /* 2/2
+                     *
+                     * Restore the previous value of the function frames symbol table
+                     */
+                    fnframe->cf_symtab = old_sym_tab;
                 }
                 break;
             }
