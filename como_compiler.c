@@ -644,6 +644,10 @@ static Object *builtin_write(Object *args)
 {
     Object *arg = O_AVAL(args)->table[ 0 ];
 
+    if(O_TYPE(arg) == IS_STRING) {
+        int n = fputs(O_SVAL(arg)->value, stdout);
+        return newLong((long)n);
+    }
     char *sval = objectToString(arg);
 
     int n = fprintf(stdout, "%s", sval);
