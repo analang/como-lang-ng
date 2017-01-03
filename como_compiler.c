@@ -640,6 +640,21 @@ static Object *builtin_len(Object *args)
         return newLong(0L);
 }
 
+static Object *builtin_write(Object *args) 
+{
+    Object *arg = O_AVAL(args)->table[ 0 ];
+
+    char *sval = objectToString(arg);
+
+    int n = fprintf(stdout, "%s", sval);
+
+    fflush(stdout);
+
+    free(sval);
+
+    return newLong((long)n);
+}
+
 
 static void como_execute(ComoFrame *frame) 
 {
@@ -1146,7 +1161,13 @@ static void _como_compile_ast(ast_node *p, const char *filename, int dump_asm) {
     ComoBuiltinFunction len_function;
     len_function.handler = builtin_len;
 
+    ComoBuiltinFunction write_function;
+    write_function.handler = builtin_write;
+
     mapInsertEx(global_frame->cf_symtab, "len", newFunction((void *)&len_function));
+    mapInsertEx(global_frame->cf_symtab, "write", newFunction((void *)&write_function));
+
+
 
     (void)como_compile(p, global_frame);
     
