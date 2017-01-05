@@ -22,6 +22,7 @@
 #include <object.h>
 
 #include "como_ast.h"
+#include "como_stack.h"
 
 #define COMO_DEFAULT_FRAME_STACKSIZE 2048U
 
@@ -41,8 +42,10 @@ typedef struct ComoFrame
     struct ComoFrame *next;
     Object           *namedparameters;
     Object           *filename;
+    como_stack       *call_stack;
 } ComoFrame;
 
+void como_print_stack_trace();
 void como_compile_ast(ast_node *p, const char *filename);
 void como_dump_asm(ast_node *p, const char *filename);
 

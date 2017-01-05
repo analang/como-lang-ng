@@ -37,13 +37,13 @@
 
 static ComoFrame *global_frame = NULL;
 
-static void log_call_info(const char *name, int lineno, int colno)
-{   
+static void call_stack_push(como_stack **stack, Object *name, Object *lineno) 
+{
     Object *call_site_tuple = newArray(2);
-    arrayPushEx(call_site_tuple, newLong((long)lineno));
-    arrayPushEx(call_site_tuple, newLong((long)colno));
+    arrayPushEx(call_site_tuple, name);
+    arrayPushEx(call_site_tuple, lineno);
 
-    mapInsertEx(global_frame->callinfo, name, call_site_tuple);
+    como_stack_push(stack, call_site_tuple);
 }
 
 void como_print_stack_trace() 
@@ -51,9 +51,9 @@ void como_print_stack_trace()
     como_stack *stack = global_frame->call_stack;
 
     while(stack != NULL) {
-        const char *name = O_SVAL(((Object *)stack->value))->value;
-        Object *call_site_info = mapSearchEx(global_frame->callinfo, name);
-        long lineno = O_LVAL(O_AVAL(call_site_info)->table[0]);
+        Object *callinfo = (Object *)stack->value;
+        const char *name = O_SVAL(O_AVAL(callinfo)->table[0])->value;
+        long lineno = O_LVAL(O_AVAL(callinfo)->table[1]);
 
         fprintf(stderr, "  at %s (%s:%ld)\n", name, 
             O_SVAL(global_frame->filename)->value, lineno);
@@ -135,7 +135,6 @@ static ComoFrame *create_frame(Object *code)
     frame->namedparameters = newArray(2);
     frame->filename = NULL;
     frame->call_stack = NULL;
-    frame->callinfo = newMap(8);
 
     return frame;
 }
@@ -547,8 +546,6 @@ static void como_compile(ast_node* p, ComoFrame *frame)
             int lineno = p->u1.call_node.lineno;
             int colno = p->u1.call_node.colno;
 
-            log_call_info(name, lineno, colno);
-
             como_compile(p->u1.call_node.arguments, frame);
 
             arrayPushEx(frame->code, newPointer(
@@ -556,6 +553,9 @@ static void como_compile(ast_node* p, ComoFrame *frame)
 
             arrayPushEx(frame->code, newPointer(
                     (void *)create_op(LOAD_NAME, newString(name))));
+
+            arrayPushEx(frame->code, newPointer(
+                    (void *)create_op(LOAD_CONST, newLong((long)lineno))));
 
             arrayPushEx(frame->code, newPointer(
                     (void *)create_op(CALL_FUNCTION, newString(name))));
@@ -1069,12 +1069,13 @@ static void como_execute(ComoFrame *frame)
                 break;
             }
             case CALL_FUNCTION: {
+                Object *lineno = pop(frame);
                 Object *fn = pop(frame);
                 Object *argcount = pop(frame);
                 long i = O_LVAL(argcount);
                 ComoFrame *fnframe;
 
-                como_stack_push(&global_frame->call_stack, (void *)opcode->operand);
+                call_stack_push(&global_frame->call_stack, (void *)opcode->operand, lineno);
 
                 if(O_TYPE(fn) != IS_POINTER && O_TYPE(fn) != IS_FUNCTION) {
                     como_error_noreturn("name '%s' is not callable",
@@ -1210,9 +1211,8 @@ static void _como_compile_ast(ast_node *p, const char *filename, int dump_asm) {
     mapInsertEx(global_frame->cf_symtab, "write", newFunction((void *)&write_function));
 
 
-    como_stack_push(&global_frame->call_stack, newString("__main__"));
-    log_call_info("__main__", 0, 0);
-
+    call_stack_push(&global_frame->call_stack, newString("__main__"), newLong(0L));
+    
     (void)como_compile(p, global_frame);
     
     arrayPushEx(main_code, newPointer((void *)create_op(HALT, NULL)));
