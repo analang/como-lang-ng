@@ -21,6 +21,7 @@
 #include <stdlib.h>
 
 #include "como_debug.h"
+#include "como_compiler.h"
 
 void como_debug_ex(const char *f, const char *fn, int ln, 
         const char* format, ...)
@@ -43,10 +44,7 @@ void __attribute__ ((noreturn)) como_error_noreturn_ex(const char *f,
     vfprintf (stderr, format, args);
     va_end (args);
     fprintf(stderr, ANSI_COLOR_RESET  "\n");
-#ifdef COMO_COMPILER
-    fprintf(stderr, "Traceback (most recent call first):\n");
     como_print_stack_trace();
-#endif
     fflush(stderr);	
     exit(1);
 }

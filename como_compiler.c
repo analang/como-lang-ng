@@ -21,6 +21,8 @@
 #include <object.h>
 #include <assert.h>
 
+#define COMO_COMPILER 1
+
 #include "como_ast.h"
 #include "como_stack.h"
 #include "como_debug.h"
@@ -32,7 +34,33 @@
 #include "como_io.h"
 #include "como_object.h"
 
+
 static ComoFrame *global_frame = NULL;
+
+static void log_call_info(const char *name, int lineno, int colno)
+{   
+    Object *call_site_tuple = newArray(2);
+    arrayPushEx(call_site_tuple, newLong((long)lineno));
+    arrayPushEx(call_site_tuple, newLong((long)colno));
+
+    mapInsertEx(global_frame->callinfo, name, call_site_tuple);
+}
+
+void como_print_stack_trace() 
+{
+    como_stack *stack = global_frame->call_stack;
+
+    while(stack != NULL) {
+        const char *name = O_SVAL(((Object *)stack->value))->value;
+        Object *call_site_info = mapSearchEx(global_frame->callinfo, name);
+        long lineno = O_LVAL(O_AVAL(call_site_info)->table[0]);
+
+        fprintf(stderr, "  at %s (%s:%ld)\n", name, 
+            O_SVAL(global_frame->filename)->value, lineno);
+
+        stack = stack->next;
+    }
+}
 
 static void _como_asm_dump(FILE *fp, ComoFrame *frame);
 
@@ -106,6 +134,8 @@ static ComoFrame *create_frame(Object *code)
     frame->next = NULL;
     frame->namedparameters = newArray(2);
     frame->filename = NULL;
+    frame->call_stack = NULL;
+    frame->callinfo = newMap(8);
 
     return frame;
 }
@@ -514,7 +544,13 @@ static void como_compile(ast_node* p, ComoFrame *frame)
                 .statements_node
                 .count;
 
+            int lineno = p->u1.call_node.lineno;
+            int colno = p->u1.call_node.colno;
+
+            log_call_info(name, lineno, colno);
+
             como_compile(p->u1.call_node.arguments, frame);
+
             arrayPushEx(frame->code, newPointer(
                     (void *)create_op(LOAD_CONST, newLong(argcount)))); 
 
@@ -1038,6 +1074,8 @@ static void como_execute(ComoFrame *frame)
                 long i = O_LVAL(argcount);
                 ComoFrame *fnframe;
 
+                como_stack_push(&global_frame->call_stack, (void *)opcode->operand);
+
                 if(O_TYPE(fn) != IS_POINTER && O_TYPE(fn) != IS_FUNCTION) {
                     como_error_noreturn("name '%s' is not callable",
                         O_SVAL(opcode->operand)->value);
@@ -1172,6 +1210,8 @@ static void _como_compile_ast(ast_node *p, const char *filename, int dump_asm) {
     mapInsertEx(global_frame->cf_symtab, "write", newFunction((void *)&write_function));
 
 
+    como_stack_push(&global_frame->call_stack, newString("__main__"));
+    log_call_info("__main__", 0, 0);
 
     (void)como_compile(p, global_frame);
     
