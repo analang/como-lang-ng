@@ -20,6 +20,8 @@
 
 #include <stdarg.h>
 
+#include "como_compiler.h"
+
 #ifdef COMO_DEBUG
 #define COMO_HAVE_DEBUG 1
 #endif
@@ -35,11 +37,11 @@
 void como_debug_ex(const char *f, 
         const char *fn, int ln, const char* format, ...);
 
-void __attribute__ ((noreturn)) como_error_noreturn_ex(const char *f, 
+void __attribute__ ((noreturn)) como_error_noreturn_ex(ComoFrame *frame, const char *f, 
         const char *fn, int ln, const char* format, ...);
 
-#define como_error_noreturn(format, ...) \
-    como_error_noreturn_ex(__FILE__, __func__, __LINE__, format, ##__VA_ARGS__)  
+#define como_error_noreturn(frame, format, ...) \
+    como_error_noreturn_ex(frame, __FILE__, __func__, __LINE__, format, ##__VA_ARGS__)  
 
 #ifdef COMO_HAVE_DEBUG
 #define como_debug(format, ...) \

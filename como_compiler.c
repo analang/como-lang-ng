@@ -46,19 +46,19 @@ static void call_stack_push(como_stack **stack, Object *name, Object *lineno)
     como_stack_push(stack, call_site_tuple);
 }
 
-void como_print_stack_trace() 
+void como_print_stack_trace(ComoFrame *frame) 
 {
-    como_stack *stack = global_frame->call_stack;
-
-    while(stack != NULL) {
-        Object *callinfo = (Object *)stack->value;
-        const char *name = O_SVAL(O_AVAL(callinfo)->table[0])->value;
-        long lineno = O_LVAL(O_AVAL(callinfo)->table[1]);
+    
+    fprintf(stderr, "stack trace for frame: \"%s\" (last called, first)\n", O_SVAL(frame->name)->value);
+    
+    while(frame != NULL) {
+        const char *name = O_SVAL(frame->name)->value;
 
         fprintf(stderr, "  at %s (%s:%ld)\n", name, 
-            O_SVAL(global_frame->filename)->value, lineno);
+            O_SVAL(global_frame->filename)->value,
+            O_LVAL(frame->lineno));
 
-        stack = stack->next;
+        frame = frame->next;
     }
 }
 
@@ -82,7 +82,7 @@ static void push(ComoFrame *frame, Object *value)
 {
     if(frame->cf_sp >= COMO_DEFAULT_FRAME_STACKSIZE) 
     {
-        como_error_noreturn("error stack overflow tried to push onto #%zu", 
+        como_error_noreturn(frame, "error stack overflow tried to push onto #%zu", 
                 frame->cf_sp);
     } 
     else 
@@ -98,7 +98,7 @@ static Object *pop(ComoFrame *frame)
     
     if(frame->cf_sp == 0) 
     {
-        como_error_noreturn("stack underflow, tried to go before 0");
+        como_error_noreturn(frame, "stack underflow, tried to go before 0");
     } 
     else 
     {
@@ -117,7 +117,7 @@ static ComoOpCode *create_op(unsigned char op, Object *oper)
     return ret;
 }
 
-static ComoFrame *create_frame(Object *code) 
+static ComoFrame *create_frame(Object *code, const char *name) 
 {
     size_t i;
     ComoFrame *frame = malloc(sizeof(ComoFrame));
@@ -135,7 +135,8 @@ static ComoFrame *create_frame(Object *code)
     frame->namedparameters = newArray(2);
     frame->filename = NULL;
     frame->call_stack = NULL;
-
+    frame->name = newString(name);
+    frame->caller = NULL;
     return frame;
 }
 
@@ -143,7 +144,7 @@ static Object *como_proxy_not_null_check(Object *maybe)
 {
     if(maybe == NULL) 
     {
-        como_error_noreturn("allocation of Object failed, exiting");
+        como_error_noreturn(NULL, "allocation of Object failed, exiting");
     }
 
     return maybe;
@@ -172,7 +173,7 @@ static void _como_asm_dump(FILE *fp, ComoFrame *frame)
         {
             default: 
             {
-                como_error_noreturn("Invalid OpCode got %d", opcode->op_code);
+                como_error_noreturn(NULL, "Invalid OpCode got %d", opcode->op_code);
             }
             case GET_FIELD:
             {
@@ -316,7 +317,7 @@ static void como_compile(ast_node* p, ComoFrame *frame)
     switch(p->type) 
     {
         default:
-            como_error_noreturn("Invalid node type(%d)", p->type);
+            como_error_noreturn(NULL, "Invalid node type(%d)", p->type);
         break;
         case AST_NODE_TYPE_SLOT_ACCESS:
             como_compile(p->u1.slot_access_node.value, frame);
@@ -481,7 +482,8 @@ static void como_compile(ast_node* p, ComoFrame *frame)
             const char *name = p->u1.function_node.name;
             Object *func_decl = newArray(4);
             Object *func_decl_parameters = newArray(2);
-            ComoFrame *func_decl_frame = create_frame(func_decl);
+            ComoFrame *func_decl_frame = create_frame(func_decl, name);
+            func_decl_frame->lineno = newLong(0L);
             func_decl_frame->namedparameters = func_decl_parameters;
 
             if(frame->filename != NULL) 
@@ -696,7 +698,7 @@ static Object *builtin_write(Object *args)
 }
 
 
-static void como_execute(ComoFrame *frame) 
+static void como_execute(ComoFrame *frame, ComoFrame *callingframe) 
 {
     size_t i;
     for(i = 0; i < O_AVAL(frame->code)->size; i++) 
@@ -707,14 +709,14 @@ static void como_execute(ComoFrame *frame)
         {
             default: 
             {
-                como_error_noreturn("Invalid OpCode got %d", opcode->op_code);
+                como_error_noreturn(NULL, "Invalid OpCode got %d", opcode->op_code);
             }
             case UNARY_MINUS:
             {
                 Object *value = pop(frame);
 
                 if(O_TYPE(value) != IS_LONG) {
-                    como_error_noreturn("UNARY_MINUS can only be used on ints");
+                    como_error_noreturn(frame, "UNARY_MINUS can only be used on ints");
                 }
 
                 push(frame, newLong(-O_LVAL(value)));
@@ -728,7 +730,7 @@ static void como_execute(ComoFrame *frame)
                 Object *value = pop(frame);
 
                 if(O_TYPE(value) != IS_STRING && O_TYPE(value) != IS_ARRAY) {
-                    como_error_noreturn("Can't get dimension value of non object\n");
+                    como_error_noreturn(frame, "Can't get dimension value of non object\n");
                 } 
 
                 if(O_TYPE(index) == IS_LONG) {
@@ -751,7 +753,8 @@ static void como_execute(ComoFrame *frame)
                         } 
                     }
                 } else {
-                    como_error_noreturn("Only ints are acceptable as slot access values");
+                    como_error_noreturn(frame, 
+                        "Only ints are acceptable as slot access values");
                 }
                 break;
             }
@@ -794,7 +797,7 @@ static void como_execute(ComoFrame *frame)
                 Object *obj = pop(frame);
                 
                 if(!como_object_is_truthy(obj)) {
-                    como_error_noreturn("como: assertion failed on line %d\n", O_LVAL(lineno));
+                    como_error_noreturn(frame, "como: assertion failed on line %d\n", O_LVAL(lineno));
                 }
 
                 break;
@@ -847,14 +850,14 @@ static void como_execute(ComoFrame *frame)
 
                 if(value == NULL) 
                 {
-                    como_error_noreturn("undefined variable '%s'", 
+                    como_error_noreturn(frame, "undefined variable '%s'", 
                         O_SVAL(opcode->operand)->value);
                 } 
                 else 
                 {
                     if(O_TYPE(value) != IS_LONG) 
                     {
-                        como_error_noreturn("unsupported value for POSTFIX_INC");
+                        como_error_noreturn(frame, "unsupported value for POSTFIX_INC");
                     } 
                     else 
                     {
@@ -871,11 +874,11 @@ static void como_execute(ComoFrame *frame)
                     O_SVAL(opcode->operand)->value);
 
                 if(value == NULL) {
-                    como_error_noreturn("undefined variable '%s'", 
+                    como_error_noreturn(frame, "undefined variable '%s'", 
                         O_SVAL(opcode->operand)->value);
                 } else {
                     if(O_TYPE(value) != IS_LONG) {
-                        como_error_noreturn("unsupported value for POSTFIX_DEC");
+                        como_error_noreturn(frame, "unsupported value for POSTFIX_DEC");
                     } else {
                         long oldvalue = O_LVAL(value);
                         O_LVAL(value) = oldvalue - 1;
@@ -927,7 +930,7 @@ static void como_execute(ComoFrame *frame)
                 assert(right);
                 assert(left);
                 if(! (O_TYPE(left) == IS_LONG && O_TYPE(right) == IS_LONG)) {
-                    como_error_noreturn("unsupported value for IMINUS");
+                    como_error_noreturn(frame, "unsupported value for IMINUS");
                 } else {
                     push(frame, newLong(O_LVAL(left) - O_LVAL(right)));
                 }      
@@ -939,7 +942,7 @@ static void como_execute(ComoFrame *frame)
                 assert(right);
                 assert(left);
                 if(O_TYPE(left) != IS_LONG && O_TYPE(right) != IS_LONG) {
-                    como_error_noreturn("unsupported value for IREM");
+                    como_error_noreturn(frame, "unsupported value for IREM");
                 } else {
                     push(frame, newLong(O_LVAL(left) % O_LVAL(right)));
                 }      
@@ -1057,7 +1060,7 @@ static void como_execute(ComoFrame *frame)
                     if(next_opcode->op_code == ITYPEOF) {
                         push(frame, newNull());
                     } else {
-                        como_error_noreturn("LOAD_NAME: undefined variable '%s'", 
+                        como_error_noreturn(frame, "LOAD_NAME: undefined variable '%s'", 
                                             O_SVAL(opcode->operand)->value);
                     }
                 } 
@@ -1075,13 +1078,12 @@ static void como_execute(ComoFrame *frame)
                 long i = O_LVAL(argcount);
                 ComoFrame *fnframe;
 
-                call_stack_push(&global_frame->call_stack, (void *)opcode->operand, lineno);
-
                 if(O_TYPE(fn) != IS_POINTER && O_TYPE(fn) != IS_FUNCTION) {
-                    como_error_noreturn("name '%s' is not callable",
+                    como_error_noreturn(frame, "name '%s' is not callable",
                         O_SVAL(opcode->operand)->value);
                 }
-                
+
+
                 if(O_TYPE(fn) == IS_FUNCTION) {
                     Object *args = newArray((size_t)i);
                     ComoBuiltinFunction *builtin = (ComoBuiltinFunction *)O_FVAL(fn);
@@ -1093,6 +1095,22 @@ static void como_execute(ComoFrame *frame)
                     push(frame, retval);
                 } else {
                     fnframe = (ComoFrame *)O_PTVAL(fn);
+                    
+
+                    /*
+                    if(callingframe) {                    
+                        fprintf(stderr, "INFO: %s called me : I'm %s\n", O_SVAL(callingframe->name)->value,
+                            O_SVAL(frame->name)->value);
+                    
+                        callingframe->next = fnframe;
+                        frame->next = callingframe;
+                    }
+                    */
+
+                    frame->next = callingframe;
+                    fnframe->next = frame;
+                    fnframe->lineno = lineno;
+                    
                     /* 1/2
                      * 
                      * What is happening here?
@@ -1103,7 +1121,7 @@ static void como_execute(ComoFrame *frame)
                      Object *old_sym_tab = copyObject(fnframe->cf_symtab);
 
                     if(O_LVAL(argcount) != (long)(O_AVAL(fnframe->namedparameters)->size)) {
-                        como_error_noreturn("callable '%s' expects %ld arguments, but %ld were given",
+                        como_error_noreturn(frame, "callable '%s' expects %ld arguments, but %ld were given",
                             O_SVAL(opcode->operand)->value, (long)(O_AVAL(fnframe->namedparameters)->size), 
                             O_LVAL(argcount));
                     }
@@ -1115,7 +1133,7 @@ static void como_execute(ComoFrame *frame)
                             argvalue);
                     }
 
-                    como_execute(fnframe);
+                    como_execute(fnframe, frame);
 
                     push(frame, pop(fnframe));    
 
@@ -1139,7 +1157,7 @@ static void como_execute(ComoFrame *frame)
                 Object *left = pop(frame);
 
                 if(O_TYPE(right) != IS_LONG && O_TYPE(left) != IS_LONG) {
-                    como_error_noreturn("invalid operands for ITIMES");
+                    como_error_noreturn(frame, "invalid operands for ITIMES");
                 }
 
                 long value = O_LVAL(left) * O_LVAL(right);
@@ -1196,7 +1214,8 @@ static void como_execute(ComoFrame *frame)
 
 static void _como_compile_ast(ast_node *p, const char *filename, int dump_asm) {
     Object *main_code = newArray(4);
-    global_frame = create_frame(main_code);
+    global_frame = create_frame(main_code, "__main__");
+    global_frame->lineno = newLong(0L);
     global_frame->filename = newString(filename);
     mapInsertEx(global_frame->cf_symtab, "__FUNCTION__", 
         newString("__main__"));
@@ -1218,7 +1237,7 @@ static void _como_compile_ast(ast_node *p, const char *filename, int dump_asm) {
     arrayPushEx(main_code, newPointer((void *)create_op(HALT, NULL)));
 
     if(!dump_asm)
-        (void)como_execute(global_frame);
+        (void)como_execute(global_frame, NULL);
     else
         _como_asm_dump(stdout, global_frame);
 }

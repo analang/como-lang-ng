@@ -43,9 +43,12 @@ typedef struct ComoFrame
     Object           *namedparameters;
     Object           *filename;
     como_stack       *call_stack;
+    Object           *name;
+    Object           *lineno;
+    struct ComoFrame *caller;    
 } ComoFrame;
 
-void como_print_stack_trace();
+void como_print_stack_trace(ComoFrame *frame);
 void como_compile_ast(ast_node *p, const char *filename);
 void como_dump_asm(ast_node *p, const char *filename);
 

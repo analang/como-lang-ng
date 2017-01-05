@@ -35,7 +35,7 @@ void como_debug_ex(const char *f, const char *fn, int ln,
     fflush(stderr);	
 }
 
-void __attribute__ ((noreturn)) como_error_noreturn_ex(const char *f, 
+void __attribute__ ((noreturn)) como_error_noreturn_ex(ComoFrame *frame, const char *f, 
         const char *fn, int ln, const char* format, ...)
 {
     fprintf(stderr, ANSI_COLOR_RED  "fatal: %s:%s:%d: ", f, fn, ln);
@@ -44,7 +44,11 @@ void __attribute__ ((noreturn)) como_error_noreturn_ex(const char *f,
     vfprintf (stderr, format, args);
     va_end (args);
     fprintf(stderr, ANSI_COLOR_RESET  "\n");
-    como_print_stack_trace();
+
+    if(frame != NULL) {
+        como_print_stack_trace(frame);
+    }
+
     fflush(stderr);	
     exit(1);
 }

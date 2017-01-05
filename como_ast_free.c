@@ -103,7 +103,7 @@ void ast_node_free(ast_node *p)
 			free(p);		
 		break;
 		default:
-			como_error_noreturn("p->type not implemented (%d)", p->type);
+			como_error_noreturn(NULL, "p->type not implemented (%d)", p->type);
 		break;
 	}
 }

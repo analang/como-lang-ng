@@ -1,5 +1,33 @@
-array = [1,2,3,4];
+function init() {
+  name = [];
 
-for(i = 0; i < len(array); i++) {
-  print( array [ i ] );
+  print(name["DFDFDF"]);
+
+
+  array = [1,2,3,4];
+
+  for(i = 0; i < len(array); i++) {
+    print( array [ i ] );
+  }
 }
+
+function init_proxy() {
+  init();
+}
+
+
+
+function noop() {
+
+}
+
+noop();
+
+
+/*
+ * Should die as so (last call first)
+ * init
+ *    - > init_proxy
+ *                 - > __main_:x
+ */
+init_proxy();
