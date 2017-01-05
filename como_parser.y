@@ -368,19 +368,19 @@ ast_node *como_parse(const char *filename)
 
     if(text == NULL) 
     {
-        como_error_noreturn("can't open '%s'\n", filename);
+        goto fail;
     }
     
     if(yylex_init(&scanner)) 
     {
-        como_error_noreturn("error parsing file");
+        goto fail;
     }
 
     state = yy_scan_string(text, scanner);
 
     if(yyparse(&statements, scanner)) 
     {
-        como_error_noreturn("error parsing file");
+        goto fail;
     }
 
     yy_delete_buffer(state, scanner);
@@ -390,6 +390,11 @@ ast_node *como_parse(const char *filename)
     free(text);
 
     return statements;
+
+fail:
+  fprintf(stdout, "Error parsing file '%s'\n", filename);
+  fflush(stdout);
+  exit(1);
 }
 
 
