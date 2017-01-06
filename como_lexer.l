@@ -97,7 +97,10 @@ D   [0-9]
 	return T_ID;
 }
 
-{D}+		      { yylval->number = strtol(yytext, NULL, 10); return T_NUM; }
+{D}+		      { 
+	yylval->number = strtol(yytext, NULL, 10); 
+	return T_NUM; 
+}
 
 L?\"(\\.|[^\\"])*\"	{ 
 	size_t len = strlen(yytext);
@@ -112,6 +115,21 @@ L?\"(\\.|[^\\"])*\"	{
 		return T_STR_LIT;
 	}
 }
+
+L?\'(\\.|[^\\'])*\'	{ 
+	size_t len = strlen(yytext);
+	if(len > 2U) {
+		yylval->stringliteral = malloc((len -2) + 1);
+		memcpy(yylval->stringliteral, yytext + 1, len - 2);
+		yylval->stringliteral[len - 2] = '\0';
+		return T_STR_LIT;
+	} else {
+		yylval->stringliteral = malloc(1);
+		yylval->stringliteral[0] = '\0';
+		return T_STR_LIT;
+	}
+}
+
 .		{ return yytext[0];				     }
 
 %%
