@@ -19,10 +19,14 @@
 #define COMO_OBJECT_UTIL
 
 #include <object.h>
+#include <stdarg.h>
 
-typedef struct ComoBuiltinFunction {
+typedef struct ComoBuiltinFunction 
+{
     Object *(*handler)(Object *);
 } ComoBuiltinFunction;
+
+#define ComoString_Check(obj) O_TYPE((obj)) == IS_STRING ? 1 : 0
 
 #define COMO__ARRAY_FOREACH(_ar) do { \
     size_t _i; \
@@ -37,6 +41,7 @@ typedef struct ComoBuiltinFunction {
     } \
 } while(0)
 
+void como_printf(const char *format, ...);
 
 int como_object_is_truthy(Object *obj);
 

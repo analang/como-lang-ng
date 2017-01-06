@@ -16,17 +16,48 @@
  */
 
 #include <object.h>
+#include <stdarg.h>
+
 #include "como_object.h"
+
+void como_printf(const char *format, ...) {
+    va_list args;
+    va_start (args, format);
+    while(*format) {
+        if(*format == ':') {
+            Object *arg;
+            format++;
+            switch(*format) {
+                case 'S':
+                    arg = va_arg(args, Object *);
+                    fprintf(stdout, "%s", O_SVAL(arg)->value);
+                break;
+                case 'L':
+                    arg = va_arg(args, Object *);
+                    fprintf(stdout, "%ld", O_LVAL(arg));
+                break;
+                default:
+                    format--;
+                    fputc(*format, stdout);
+                break;
+            }
+        } else {
+            fputc(*format, stdout);
+        }
+        format++;
+    }
+    va_end (args);
+}
 
 int como_object_is_truthy(Object *obj)
 {
-	/* C truthiness */
-	if(O_TYPE(obj) == IS_LONG && O_LVAL(obj) == 0L) 
-	{
-		return 0;
-	} 
-	else 
-	{
-		return 1;
-	}
+    /* C truthiness */
+    if(O_TYPE(obj) == IS_LONG && O_LVAL(obj) == 0L)
+    {
+        return 0;
+    }
+    else
+    {
+        return 1;
+    }
 }
