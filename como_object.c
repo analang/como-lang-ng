@@ -17,6 +17,7 @@
 
 #include <object.h>
 #include <stdarg.h>
+#include <float.h>
 
 #include "como_object.h"
 
@@ -35,6 +36,10 @@ void como_printf(const char *format, ...) {
                 case 'L':
                     arg = va_arg(args, Object *);
                     fprintf(stdout, "%ld", O_LVAL(arg));
+                break;
+                case 'F':
+                    arg = va_arg(args, Object *);
+                    fprintf(stdout, "%.*G", DBL_DIG, O_DVAL(arg));
                 break;
                 default:
                     format--;
