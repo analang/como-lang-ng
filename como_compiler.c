@@ -157,6 +157,21 @@ static void _como_asm_dump(FILE *fp, ComoFrame *frame)
 {
     (void)fp;
 
+    uint32_t x;
+    for(x = 0; x < O_MVAL(frame->cf_symtab)->capacity; x++) {
+        Bucket *bucket = O_MVAL(frame->cf_symtab)->buckets[x];
+        while(bucket != NULL) {
+            Object *value = bucket->value;
+            if(O_TYPE(value) == IS_POINTER) {
+                ComoFrame *fm = (ComoFrame *)O_PTVAL(value);
+                fprintf(stdout, "function %s() {\n", bucket->key->value);
+                _como_asm_dump(stdout, fm);
+                fprintf(stdout, "}\n");
+            }
+            bucket = bucket->next;
+        }
+    }
+
     size_t i;
     for(i = 0; i < O_AVAL(frame->code)->size; i++) 
     {
