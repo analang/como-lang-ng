@@ -46,18 +46,13 @@ static void call_stack_push(como_stack **stack, Object *name, Object *lineno)
     como_stack_push(stack, call_site_tuple);
 }
 
+
 void como_print_stack_trace(ComoFrame *frame) 
 {
-    
-    fprintf(stderr, "stack trace for frame: \"%s\" (last called, first)\n", O_SVAL(frame->name)->value);
+    como_printf("stack trace for frame: \":S\" (last called, first)\n", frame->name);
     
     while(frame != NULL) {
-        const char *name = O_SVAL(frame->name)->value;
-
-        fprintf(stderr, "  at %s (%s:%ld)\n", name, 
-            O_SVAL(global_frame->filename)->value,
-            O_LVAL(frame->lineno));
-
+        como_printf("  at :S (:S::L)\n", frame->name, frame->filename, frame->lineno);
         frame = frame->next;
     }
 }
@@ -602,7 +597,7 @@ static void como_compile(ast_node* p, ComoFrame *frame)
             if(p->u1.binary_node.type != AST_BINARY_OP_ASSIGN) 
             {
                 como_compile(p->u1.binary_node.left, frame);
-                como_compile(p->u1.binary_node.right, frame);       
+                como_compile(p->u1.binary_node.right, frame);
             }  
             switch(p->u1.binary_node.type) 
             {
@@ -656,6 +651,7 @@ static void como_compile(ast_node* p, ComoFrame *frame)
                 break;
                 case AST_BINARY_OP_ASSIGN: 
                     como_compile(p->u1.binary_node.right, frame);
+
                     arrayPushEx(frame->code, newPointer(
                         (void *)create_op(STORE_NAME, newString(
                             p->u1.binary_node.left->u1.id_node.name))));        
@@ -734,7 +730,7 @@ static void como_execute(ComoFrame *frame, ComoFrame *callingframe)
                 } 
 
                 if(O_TYPE(index) == IS_LONG) {
-                    long lindex = (long)O_LVAL(index);
+                    long lindex = O_LVAL(index);
 
                     if(O_TYPE(value) == IS_ARRAY) {
                         if(lindex >= 0 && lindex < (long)O_AVAL(value)->size) {
@@ -761,9 +757,6 @@ static void como_execute(ComoFrame *frame, ComoFrame *callingframe)
             case CREATE_ARRAY:
             {
                 Object *olength = pop(frame);
-
-                assert(O_TYPE(olength) == IS_LONG);
-
                 size_t length = (size_t)O_LVAL(olength);
                 Object *array = newArray(length == 0 ? 2 : length);
                 size_t i;
@@ -1054,14 +1047,13 @@ static void como_execute(ComoFrame *frame, ComoFrame *callingframe)
                     /* LOAD_NAME "identifier"
                        TYPEOF 
                      */
-                    assert((i + 1) < O_AVAL(frame->code)->size);
                     ComoOpCode *next_opcode = ((ComoOpCode *)(O_PTVAL(O_AVAL(frame->code)->table[i + 1])));
 
                     if(next_opcode->op_code == ITYPEOF) {
                         push(frame, newNull());
                     } else {
-                        como_error_noreturn(frame, "LOAD_NAME: undefined variable '%s'", 
-                                            O_SVAL(opcode->operand)->value);
+                        como_error_noreturn(frame, 
+                            "LOAD_NAME: undefined variable '%s'", O_SVAL(opcode->operand)->value);
                     }
                 } 
                 else 
@@ -1085,6 +1077,8 @@ static void como_execute(ComoFrame *frame, ComoFrame *callingframe)
 
 
                 if(O_TYPE(fn) == IS_FUNCTION) {
+                    frame->next = callingframe;
+
                     Object *args = newArray((size_t)i);
                     ComoBuiltinFunction *builtin = (ComoBuiltinFunction *)O_FVAL(fn);
                     while(i--) {
@@ -1107,7 +1101,7 @@ static void como_execute(ComoFrame *frame, ComoFrame *callingframe)
                     }
                     */
 
-                    frame->next = callingframe;
+                    frame->next = callingframe;                    
                     fnframe->next = frame;
                     fnframe->lineno = lineno;
                     
@@ -1118,13 +1112,14 @@ static void como_execute(ComoFrame *frame, ComoFrame *callingframe)
                      * If this is a recursive call, we need to save the state of the current symbol table so we don't
                      * lose it upon a call to itself
                      */
-                     Object *old_sym_tab = copyObject(fnframe->cf_symtab);
+                    Object *old_sym_tab = copyObject(fnframe->cf_symtab);
 
                     if(O_LVAL(argcount) != (long)(O_AVAL(fnframe->namedparameters)->size)) {
-                        como_error_noreturn(frame, "callable '%s' expects %ld arguments, but %ld were given",
+                        como_error_noreturn(fnframe, "callable '%s' expects %ld arguments, but %ld were given",
                             O_SVAL(opcode->operand)->value, (long)(O_AVAL(fnframe->namedparameters)->size), 
                             O_LVAL(argcount));
                     }
+
                     while(i--) {
                         Object *argname = O_AVAL(fnframe->namedparameters)->table[i];
 
