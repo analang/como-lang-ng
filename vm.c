@@ -23,6 +23,13 @@ static ComoOpCode *create_op(unsigned char op, Object *oper)
 {
     ComoOpCode *ret = malloc(sizeof(ComoOpCode));
     ret->op_code = op;
+
+    ret->flags = 0;
+
+    if(oper != NULL) {
+    	ret->flags |= COMO_OP_CODE_OPERAND_USED; 
+    }
+    
     ret->operand = oper;
     return ret;
 }
@@ -59,15 +66,21 @@ Object *Como_EvalFrame(ComoFrame *frame)
 
     #define O_DECREF(O) do { \
         if(--O_REFCNT((O)) == 0) { \
-            objectDestroy((O)); \
-        } \
+       		objectDestroy((O)); \
+	} \
     } while(0) 
+
+    #define OPR_DECREF(Opcode) do { \
+    	(Opcode)->flags |= COMO_OP_CODE_OPERAND_FREE; \
+	objectDestroy((Opcode)->operand); \
+	(Opcode)->operand = NULL; \
+    } while(0)
     
     #define TARGET(Name) \
         case Name:
 
     #define VM_CONTINUE() \
-        continue
+        goto next_opcode
 
     #define VM_DISPATCH() \
         break
@@ -88,23 +101,29 @@ Object *Como_EvalFrame(ComoFrame *frame)
 
     for(;;)
     {
-        ComoOpCode *opcode = NEXT_OPCODE();
+	ComoOpCode *opcode;
+	next_opcode:
+		opcode = NEXT_OPCODE();
         
         switch(opcode->op_code) 
         {
             default: 
             {
-                fprintf(stderr, "Invalid OpCode: %d opcode->op_code\n");
+                fprintf(stderr, "Invalid OpCode: %d opcode->op_code\n",
+				opcode->op_code);
                 exit(1);
             }
 
             TARGET(HALT)
             {
+		printf("HALT\n");
+
                 return retval;
             }
 
             TARGET(LOAD_CONST)
             {
+		printf("LOAD_CONST\n");
                 Object *arg   = OP1();
                 PUSH(arg);
                 O_INCRREF(arg);
@@ -114,19 +133,21 @@ Object *Como_EvalFrame(ComoFrame *frame)
 
             TARGET(STORE_NAME) 
             {
+		printf("STORE_NAME\n");
                 Object *value = POP();
                 Object *name  = OP1();
 
-                mapInsert(frame->cf_symtab, O_SVAL(name)->value, value);
+                mapInsertEx(frame->cf_symtab, O_SVAL(name)->value, value);
 
                 O_INCRREF(value);
 
-                O_DECREF(name);
+                OPR_DECREF(opcode);
 
                 VM_DISPATCH();
             }
             TARGET(IADD)
             {
+		printf("IADD\n");
                 Object *right = POP();
                 Object *left  = POP();
 
@@ -169,10 +190,43 @@ Object *Como_EvalFrame(ComoFrame *frame)
 }
 
 
+static void destroy_frame(ComoFrame *frame)
+{
+    uint32_t i;
+
+    objectDestroy(frame->lineno);
+    objectDestroy(frame->filename);
+    objectDestroy(frame->cf_symtab);
+    objectDestroy(frame->namedparameters);
+    objectDestroy(frame->name);
+    
+    for(i = 0; i < O_AVAL(frame->code)->size; i++)
+    {
+	ComoOpCode *op = (ComoOpCode *)O_PTVAL((O_AVAL(frame->code))->table[i]);
+
+	if((op->flags & COMO_OP_CODE_OPERAND_USED) &&
+	   !(op->flags & COMO_OP_CODE_OPERAND_FREE)) 
+	{
+		objectDestroy(op->operand);
+	}
+
+	free(op);
+    }
+   
+    objectDestroy(frame->code);
+
+    fprintf(stdout, " --- Stack Pointer:   %d\n", (int)frame->cf_sp);
+    fprintf(stdout, " --- Program Counter: %d\n", (int)frame->pc);
+    
+    free(frame);
+    
+}
+
 static void _como_compile_ast(ast_node *p, const char *filename, int dump_asm) {
     Object *main_code = newArray(4);
     
     global_frame = create_frame(main_code, "__main__");
+
     global_frame->lineno = newLong(0L);
     global_frame->filename = newString(filename);
 
@@ -183,6 +237,7 @@ static void _como_compile_ast(ast_node *p, const char *filename, int dump_asm) {
     if(!dump_asm)
         (void)Como_EvalFrame(global_frame);
 
+    destroy_frame(global_frame);
 }
 
 

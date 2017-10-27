@@ -26,9 +26,13 @@
 
 #define COMO_DEFAULT_FRAME_STACKSIZE 2048U
 
+#define COMO_OP_CODE_OPERAND_USED 0x0001
+#define COMO_OP_CODE_OPERAND_FREE 0x0002
+
 typedef struct ComoOpCode 
 {
     unsigned char op_code;
+    unsigned int  flags;
     Object       *operand;
 } ComoOpCode;
 

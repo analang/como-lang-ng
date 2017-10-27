@@ -108,6 +108,12 @@ static ComoOpCode *create_op(unsigned char op, Object *oper)
 {
     ComoOpCode *ret = malloc(sizeof(ComoOpCode));
     ret->op_code = op;
+    ret->flags = 0;
+
+    if(oper != NULL) {
+    	ret->flags |= COMO_OP_CODE_OPERAND_USED; 
+    }
+
     ret->operand = oper;
     return ret;
 }
