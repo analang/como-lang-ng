@@ -39,6 +39,7 @@ typedef struct ComoFrame
     Object           *cf_stack[(size_t)COMO_DEFAULT_FRAME_STACKSIZE];
     Object           *cf_symtab; 
     Object           *code;
+    long              pc;
     struct ComoFrame *next;
     Object           *namedparameters;
     Object           *filename;
@@ -51,5 +52,6 @@ typedef struct ComoFrame
 void como_print_stack_trace(ComoFrame *frame);
 void como_compile_ast(ast_node *p, const char *filename);
 void como_dump_asm(ast_node *p, const char *filename);
+void como_compile(ast_node* p, ComoFrame *frame);
 
 #endif /* !COMO_COMPILER_H */

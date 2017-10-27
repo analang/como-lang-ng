@@ -126,6 +126,7 @@ static ComoFrame *create_frame(Object *code, const char *name)
 
     frame->cf_symtab = newMap(4);
     frame->code = code;
+    frame->pc = 0;
     frame->next = NULL;
     frame->namedparameters = newArray(2);
     frame->filename = NULL;
@@ -317,7 +318,7 @@ static void _como_asm_dump(FILE *fp, ComoFrame *frame)
     }
 }
 
-static void como_compile(ast_node* p, ComoFrame *frame)
+void como_compile(ast_node* p, ComoFrame *frame)
 {
     #define COMO_CHECKED(result) \
         como_proxy_not_null_check((result))
@@ -1256,12 +1257,3 @@ void como_dump_asm(ast_node *p, const char *filename) {
     _como_compile_ast(p, filename, 1);
 }
 
-void como_compile_ast(ast_node *p, const char *filename) {
-    _como_compile_ast(p, filename, 0);
-}
-
-
-char *get_active_file_name(void) {
-    return "-";
-    return O_SVAL(global_frame->filename)->value;
-}

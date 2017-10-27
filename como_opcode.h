@@ -51,6 +51,7 @@
 #define IAND                            0x24
 #define CREATE_ARRAY                    0x25
 #define GET_FIELD                       0x26
-#define COMO_OPCODE_MAX                 0x27
+#define LOAD_STRING                     0x27
+#define COMO_OPCODE_MAX                 0x28
 
 #endif /* !COMO_OPCODE_H */

@@ -26,6 +26,9 @@ typedef struct ComoBuiltinFunction
     Object *(*handler)(Object *);
 } ComoBuiltinFunction;
 
+#define Obj_CheckExact(Obj, Type) \
+    (O_TYPE((Obj)) == (Type))
+
 #define ComoString_Check(obj) O_TYPE((obj)) == IS_STRING ? 1 : 0
 
 #define COMO__ARRAY_FOREACH(_ar) do { \
