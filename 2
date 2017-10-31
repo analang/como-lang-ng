@@ -77,14 +77,14 @@ Object *Como_EvalFrame(ComoFrame *frame)
 
     #define O_DECREF(O) do { \
         if(--O_REFCNT((O)) == 0) { \
-	    objectDestroy((O)); \
+       		objectDestroy((O)); \
 	} \
     } while(0) 
 
     #define OPR_DECREF(Opcode) do { \
     	(Opcode)->flags |= COMO_OP_CODE_OPERAND_FREE; \
-	O_DECREF((Opcode)->operand); \
-        (Opcode)->operand = NULL; \
+	objectDestroy((Opcode)->operand); \
+	(Opcode)->operand = NULL; \
     } while(0)
     
     #define TARGET(Name) \
@@ -112,7 +112,9 @@ Object *Como_EvalFrame(ComoFrame *frame)
 
     for(;;)
     {
-	ComoOpCode *opcode = NEXT_OPCODE();
+	ComoOpCode *opcode;
+	next_opcode:
+		opcode = NEXT_OPCODE();
        
 #ifdef COMO_DEBUG
     fprintf(stderr, "%s\n", instrstr(opcode));
@@ -131,20 +133,18 @@ Object *Como_EvalFrame(ComoFrame *frame)
                 Object *value =
                     mapSearchEx(frame->cf_symtab, O_SVAL(arg)->value);
 
-                if(value == NULL)
-                {
+                if(value == NULL) {
                     Como_SetError(
                         "Undefined symbol, %s", O_SVAL(arg)->value
                     );
-                } 
-                else 
-                {
+                } else {
+
                     O_INCRREF(value);
 
                     PUSH(value);
-                }
 
-                OPR_DECREF(opcode);
+                    OPR_DECREF(opcode);
+                }
 
                 VM_DISPATCH();
             }
@@ -158,7 +158,6 @@ Object *Como_EvalFrame(ComoFrame *frame)
                 VM_DISPATCH();
             }
 
-            /* STORE_NAME "foo" */
             TARGET(STORE_NAME) 
             {
                 Object *value = POP();
@@ -216,14 +215,6 @@ Object *Como_EvalFrame(ComoFrame *frame)
         }
     }
 
-    /* Pop remaining stack entries */
-
-    long i;
-    for(i = (long)(frame->cf_sp - 1); i >= 0; --i) {
-        fprintf(stdout, "%zu\n", frame->cf_sp);
-        O_DECREF(frame->cf_stack[i]);
-    }
-
     return retval;
 }
 
@@ -234,32 +225,7 @@ static void destroy_frame(ComoFrame *frame)
 
     objectDestroy(frame->lineno);
     objectDestroy(frame->filename);
-    
-    /* I don't call objectSafeDestroy on the symbol table, since that would
-     * recurse through the entire tree, instead free it manually
-     */
-        //objectDestroy(frame->cf_symtab);
-        // TODO libobject: create macros for freeing this by type
- 
-
-    for(i = 0; i < mapCapacity(frame->cf_symtab); i++) {
-        Bucket *b = mapGetBucket(frame->cf_symtab, i);
-
-        while(b != NULL) {
-            Bucket *bn = b->next;
-            String *key = b->key;
-            free(key->value);
-            free(key);
-            free(b);
-            b = bn;
-        }
-
-    }
-
-    free(O_MVAL(frame->cf_symtab)->buckets);
-    free(O_MVAL(frame->cf_symtab));
-    free(frame->cf_symtab);
-    
+    objectDestroy(frame->cf_symtab);
     objectDestroy(frame->namedparameters);
     objectDestroy(frame->name);
     
@@ -281,7 +247,8 @@ static void destroy_frame(ComoFrame *frame)
     fprintf(stdout, " --- Stack Pointer:   %d\n", (int)frame->cf_sp);
     fprintf(stdout, " --- Program Counter: %d\n", (int)frame->pc);
     
-    free(frame);    
+    free(frame);
+    
 }
 
 static void _como_compile_ast(ast_node *p, const char *filename, int dump_asm) {

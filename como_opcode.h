@@ -18,6 +18,16 @@
 #ifndef COMO_OPCODE_H
 #define COMO_OPCODE_H
 
+#include <object.h>
+
+typedef struct ComoOpCode 
+{
+    unsigned char op_code;
+    unsigned int  flags;
+    unsigned int  lineno;
+    Object       *operand;
+} ComoOpCode;
+
 #define INONE                           0x00
 #define LOAD_CONST                      0x01
 #define STORE_NAME                      0x02
@@ -53,5 +63,11 @@
 #define GET_FIELD                       0x26
 #define LOAD_STRING                     0x27
 #define COMO_OPCODE_MAX                 0x28
+
+extern const char * const str_opcodelist[];
+
+extern const char *instrstr(ComoOpCode *op);
+
+//extern ComoOpCode *create_op(unsigned char op, int lineno, Object *arg);
 
 #endif /* !COMO_OPCODE_H */

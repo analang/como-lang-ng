@@ -46,6 +46,7 @@ void __attribute__ ((noreturn)) como_error_noreturn_ex(ComoFrame *frame, const c
 #ifdef COMO_HAVE_DEBUG
 #define como_debug(format, ...) \
         como_debug_ex(__FILE__, __func__, __LINE__, format, ##__VA_ARGS__)
+
 #else
 #define como_debug(format, ...)
 #endif
