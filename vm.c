@@ -29,6 +29,8 @@ static ComoOpCode *create_op(unsigned char op, Object *oper)
     if(oper != NULL) {
     	ret->flags |= COMO_OP_CODE_OPERAND_USED; 
     }
+
+    // TODO, line numbers
     
     ret->operand = oper;
     return ret;
@@ -57,6 +59,15 @@ static ComoFrame *create_frame(Object *code, const char *name)
     frame->caller = NULL;
     return frame;
 }
+
+static int exception = 0;
+static char exmessage[1024];
+
+#define Como_SetError(fmt, ...) do { \
+    exception = 1; \
+    memset(exmessage, 0, sizeof(exmessage)); \
+    sprintf(exmessage, fmt, __VA_ARGS__); \
+} while(0)
 
 /* VM main loop */
 Object *Como_EvalFrame(ComoFrame *frame)
@@ -107,18 +118,34 @@ Object *Como_EvalFrame(ComoFrame *frame)
         
         switch(opcode->op_code) 
         {
-            default: 
-            {
-                fprintf(stderr, "Invalid OpCode: %d opcode->op_code\n",
-				opcode->op_code);
-                exit(1);
-            }
-
             TARGET(HALT)
             {
 		printf("HALT\n");
 
                 return retval;
+            }
+
+            TARGET(LOAD_NAME)
+            {
+                Object *arg = OP1();
+                Object *value =
+                    mapSearchEx(frame->cf_symtab, O_SVAL(arg)->value);
+
+                if(value == NULL) {
+                    Como_SetError(
+                        "Undefined symbol, %s\n", O_SVAL(arg)->value
+                    );
+                    
+                    VM_DISPATCH();
+                }
+
+                O_INCRREF(value);
+
+                PUSH(value);
+
+                OPR_DECREF(opcode);
+
+                VM_DISPATCH();
             }
 
             TARGET(LOAD_CONST)
@@ -183,6 +210,11 @@ Object *Como_EvalFrame(ComoFrame *frame)
 
                 VM_DISPATCH();              
             }
+        }
+
+        if(exception) {
+            como_error_noreturn(frame, exmessage);
+
         }
     }
 
