@@ -31,7 +31,7 @@
 
 typedef struct ComoFrame 
 {
-    size_t            cf_sp;
+    long              cf_sp;
     size_t            cf_stack_size;
     Object           *cf_stack[(size_t)COMO_DEFAULT_FRAME_STACKSIZE];
     Object           *cf_symtab; 
