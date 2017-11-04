@@ -6,7 +6,16 @@
 
 #include "como_opcode.h"
 
-/* Opcode 1 byte opcode, 2 byte argument, 1 byte flag */
+/* Opcode 1 byte opcode, 2 byte argument, 1 byte flag 
+ *
+ *
+ *
+ *
+ * 0x010000FE
+ * OPCODE ARGUMENT FLAG
+ * 01     0000     FE
+ *
+ * */
 
 #define OP(i) ((i) >> 24 & 0xff)
 #define OP1(i)  ((i) >> 8 & 0xffff)
@@ -35,6 +44,11 @@ static void init_frame(Frame *frame)
     frame->sp = 0;
 }
 
+#define TRACE(op) do { \
+    printf("%#010X\n", op); \
+} while(0)
+
+
 static int Como_EvalFrameEx(Frame *frame)
 {
     #define NEXT_OPCODE() ((frame->code[frame->pc++]) >> 24 & 0xff)
@@ -53,6 +67,8 @@ static int Como_EvalFrameEx(Frame *frame)
     for(;;)
     {
         op = NEXT_OPCODE();
+
+        TRACE(frame->code[frame->pc - 1]);
 
         fprintf(stderr, "pc=%d\n", frame->pc);
 
