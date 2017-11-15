@@ -83,6 +83,9 @@ static Frame *create_add_function()
 #define Object_TypeCheck(obj, type) \
     (O_TYPE((obj)) == (type))
 
+#define Would_Overflow(a, b) \
+    (((b > 0L) && (a > LONG_MAX - b)) || ((b < 0L) && (a < LONG_MIN - b)))
+
 static Object *do_add(Object *ob1, Object *ob2)
 {
     if(Object_TypeCheck(ob1, IS_STRING) &&
@@ -94,7 +97,18 @@ static Object *do_add(Object *ob1, Object *ob2)
             Object_TypeCheck(ob2, IS_LONG))
     {
 
-        return newLong(O_LVAL(ob1) + O_LVAL(ob2));
+        if(Would_Overflow(O_LVAL(ob1), O_LVAL(ob2)))
+        {
+            fprintf(stderr, "%s\n", 
+                "warning: evalulation of expression "
+                "would overflow");
+
+            return newLong(0L);
+        } 
+        else 
+        {            
+            return newLong(O_LVAL(ob1) + O_LVAL(ob2));
+        }
     }
     else if
         ((Object_TypeCheck(ob1, IS_DOUBLE) || Object_TypeCheck(ob1, IS_LONG))
@@ -170,14 +184,16 @@ static Object *Como_EvalFrameEx(Frame *frame)
 
     for(;;)
     {
-        fprintf(stderr, "Executing frame %s\n", O_SVAL(frame->name)->value);
-        if(frame->parent) {
-            fprintf(stderr, "\tI was called from %s\n",
-                O_SVAL(frame->parent->name)->value);
-        }
-
         VM_CASE(FETCH()) 
         { 
+            VM_TARGET(IPRINT)
+            {
+                value = POP();
+
+                objectEcho(value);
+
+                VM_BREAK();
+            }
 
             VM_TARGET(LOAD_CONST)
             {
@@ -235,8 +251,6 @@ static Object *Como_EvalFrameEx(Frame *frame)
                     result = Como_EvalFrameEx(this_function);
 
                     PUSH(result);
-                    // Recursive call to this current C function
-                    // TODO setup stack
                 }
 
                 VM_BREAK();
@@ -281,8 +295,14 @@ done:
     return retval;
 }
 
+static void dump_config()
+{
+    fprintf(stderr, "LONG_MAX=%ld\n", LONG_MAX);
+}
+
 int main(void)
 {
+    dump_config();
 
     struct Frame frame;
 
@@ -293,10 +313,10 @@ int main(void)
     Frame *add_function = create_add_function();
     add_local(&frame, "add", newPointer(add_function));
     
-    add_int_constant(&frame, -150);
+    add_int_constant(&frame, 1);
     emit(&frame, LOAD_CONST, CONSTANT_PTR(&frame), 0);
 
-    add_double_constant(&frame,  50.5);
+    add_int_constant(&frame, LONG_MAX);
     emit(&frame, LOAD_CONST, CONSTANT_PTR(&frame), 0);
 
     add_string_constant(&frame, "add");
@@ -304,13 +324,15 @@ int main(void)
 
     emit(&frame, CALL_FUNCTION, 2, 0);
 
+    emit(&frame, IPRINT, 0, 0);
 
     emit(&frame, IRETURN, 0, 0);
     emit(&frame, HALT,    0, 0);
 
     Object *retval = Como_EvalFrameEx(&frame);
 
-    OBJECT_DUMP(retval);
+    if(retval)
+        OBJECT_DUMP(retval);
 
     return 0;
 }
