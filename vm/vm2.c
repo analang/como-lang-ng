@@ -9,6 +9,7 @@ typedef struct _como_frame {
   como_object *constants;
   como_object *locals;
   como_object **stack;
+  /* TODO, more roots, one per each frame */
   como_object *root;
   como_size_t pc;
   como_size_t sz;
@@ -153,6 +154,26 @@ static como_object *isgte(como_frame *f, como_object *a, como_object *b)
   return gc_new(f, a->type->obj_compops->obj_gte(a, b)); 
 }
 
+/* C truthness */
+static int truthy(como_object *a) 
+{
+  if(como_type_is(a, como_long_type))
+    return ((como_long *)a)->value != 0;
+  else if(como_type_is(a, como_double_type))
+    return ((como_double *)a)->value != 0.0;
+  else if(como_type_is(a, como_string_type))
+    return ((como_string *)a)->len != 0;
+  else if(como_type_is(a, como_map_type))
+    return como_get_container(a)->size != 0;
+  else if(como_type_is(a, como_array_type))
+    return como_get_container(a)->size != 0;
+  else if(como_type_is(a, como_bool_type))
+    return como_get_bool(a)->value != 0;
+  else
+    return 1;
+}
+
+
 #define int_const(frame, value) \
   (como_array_push(frame->constants, gc_new(frame, como_longfromlong(value))), \
   (como_container_size(frame->constants) - 1))
@@ -208,8 +229,21 @@ const char *ex = NULL;
 #define set_except(x) \
   ex = x;
 
+  top:
   for(;;) {
     vm_case(fetch()) {
+      vm_target(JMP) {
+        frame->pc = get_arg();
+        goto top;
+      }
+      vm_target(JZ) {
+        result = pop();
+        if(!truthy(result)) {
+          frame->pc = get_arg();
+          goto top;
+        }
+        vm_continue();
+      }
       vm_target(LOAD_CONST) {
         arg = get_const(get_arg());
         push(arg);
