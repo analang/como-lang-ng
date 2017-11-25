@@ -15,12 +15,20 @@ typedef struct _como_frame {
   como_size_t sp;
 } como_frame;
 
+/* TODO, since functions can be stored as names,
+  I should create a function_object, (a subclass of como_object
+  which is basically just a frame object */
+/* I can perhaps create a frame object with a code object as argument */
+/* Then I can implement a constructor, destructor for the function object 
+   to be called when it is called, and finished from calling */
 static void como_frame_dtor(como_frame *f)
 {
   como_object_dtor(f->name);
   como_object_dtor(f->code);
+  /* Each time a function is called, these need to be cleared */
   como_object_dtor(f->constants);
   como_object_dtor(f->locals);
+
   free(f->stack);
   free(f);
 }
@@ -30,7 +38,7 @@ static como_frame *como_frame_new(char *name)
   como_frame *f = malloc(sizeof(*f));
 
   f->name      = como_stringfromstring(name);
-  f->code      = como_array_new(8);
+  f->code      = como_code_new(8);
   f->constants = como_array_new(8);
   f->locals    = como_map_new(8);
   f->stack     = malloc(sizeof(como_object *) * 255);
@@ -73,12 +81,88 @@ static como_object *add(como_frame *f, como_object *a, como_object *b)
   return NULL;
 }
 
+static como_object *sub(como_frame *f, como_object *a, como_object *b)
+{
+  if(a->type->obj_binops != NULL && a->type->obj_binops->obj_sub != NULL)
+    return gc_new(f, a->type->obj_binops->obj_sub(a, b));
+  return NULL;
+}
+
+static como_object *mul(como_frame *f, como_object *a, como_object *b)
+{
+  if(a->type->obj_binops != NULL && a->type->obj_binops->obj_mul != NULL)
+    return gc_new(f, a->type->obj_binops->obj_mul(a, b));
+  return NULL;
+}
+
+static como_object *rem(como_frame *f, como_object *a, como_object *b)
+{
+  if(a->type->obj_binops != NULL && a->type->obj_binops->obj_rem != NULL)
+    return gc_new(f, a->type->obj_binops->obj_rem(a, b));
+  return NULL;
+}
+
+static como_object *do_div(como_frame *f, como_object *a, como_object *b)
+{
+  if(a->type->obj_binops != NULL && a->type->obj_binops->obj_div != NULL)
+    return gc_new(f, a->type->obj_binops->obj_div(a, b));
+  return NULL;
+}
+
+static como_object *unaryminus(como_frame *f, como_object *a)
+{ 
+  if(a->type->obj_binops != NULL && a->type->obj_unops->obj_minus != NULL)
+    return gc_new(f, a->type->obj_unops->obj_minus(a));
+  return NULL;
+}
+
+static como_object *unaryplus(como_frame *f, como_object *a)
+{ 
+  if(a->type->obj_binops != NULL && a->type->obj_unops->obj_plus != NULL)
+    return gc_new(f, a->type->obj_unops->obj_plus(a));
+  return NULL;
+}
+
+static como_object *isequal(como_frame *f, como_object *a, como_object *b)
+{
+  return gc_new(f, a->type->obj_compops->obj_eq(a, b));
+}
+
+static como_object *nequal(como_frame *f, como_object *a, como_object *b)
+{
+  return gc_new(f, a->type->obj_compops->obj_neq(a, b));
+}
+
+static como_object *isgt(como_frame *f, como_object *a, como_object *b)
+{
+  return gc_new(f, a->type->obj_compops->obj_gt(a, b)); 
+}
+
+static como_object *islt(como_frame *f, como_object *a, como_object *b)
+{
+  return gc_new(f, a->type->obj_compops->obj_lt(a, b)); 
+}
+
+static como_object *islte(como_frame *f, como_object *a, como_object *b)
+{
+  return gc_new(f, a->type->obj_compops->obj_lte(a, b)); 
+}
+
+static como_object *isgte(como_frame *f, como_object *a, como_object *b)
+{
+  return gc_new(f, a->type->obj_compops->obj_gte(a, b)); 
+}
+
 #define int_const(frame, value) \
   (como_array_push(frame->constants, gc_new(frame, como_longfromlong(value))), \
   (como_container_size(frame->constants) - 1))
 
 #define str_const(frame, value) \
   (como_array_push(frame->constants, gc_new(frame, como_stringfromstring(value))), \
+  (como_container_size(frame->constants) - 1))
+
+#define dbl_const(frame, value) \
+  (como_array_push(frame->constants, gc_new(frame, como_doublefromdouble(value))), \
   (como_container_size(frame->constants) - 1))
 
 #define PACK_INSTRUCTION(opcode, argument, flag) \
@@ -114,6 +198,8 @@ static como_object *como_frame_eval(como_frame *frame)
 #define empty() \
   (frame->sp == 0)
 
+#define getflag() (((como_code_get(frame->code, frame->pc -1)) & 0xff))
+
 como_object *arg;
 como_object *retval = NULL;
 como_object *left, *right, *result;
@@ -135,14 +221,13 @@ const char *ex = NULL;
         como_map_put(frame->locals, arg, result);
         vm_continue();
       }
-      vm_target(LOAD_NAME)
-      {
+      vm_target(LOAD_NAME){
         arg = get_const(get_arg());
         result = como_map_get(frame->locals, arg);
         if(result)
           push(result);
         else
-          set_except("undefined variable");
+          set_except("NameError, undefined variable");
         vm_continue();
       }
       vm_target(IADD) {
@@ -155,14 +240,115 @@ const char *ex = NULL;
           set_except("unsupported operands for + operator");
         vm_continue();
       }
+      vm_target(IMINUS) {
+        right = pop();
+        left  = pop();
+        result = sub(frame, left, right);
+        if(result)
+          push(result);
+        else
+          set_except("unsupported operands for - operator");
+        vm_continue();
+      }
+      vm_target(ITIMES) {
+        right = pop();
+        left  = pop();
+        result = mul(frame, left, right);
+        if(result)
+          push(result);
+        else
+          set_except("unsupported operands for * operator");
+        vm_continue();      
+      }
+      vm_target(IDIV) {
+        right = pop();
+        left  = pop();
+        result = do_div(frame, left, right);
+        if(result)
+          push(result);
+        else
+          set_except("unsupported operands for / operator");
+        vm_continue();
+      }
+      vm_target(IREM) {
+        right = pop();
+        left  = pop();
+        result = rem(frame, left, right);
+        if(result)
+          push(result);
+        else
+          set_except("unsupported operands for % operator");
+        vm_continue();         
+      }
+      vm_target(UNARY_MINUS) {
+        left = pop();
+        result = unaryminus(frame, left);
+        if(result)
+          push(result);
+        else
+          set_except("unsupported operand for unary -");
+        vm_continue();
+      }
+      vm_target(UNARY_PLUS) {
+        left = pop();
+        result = unaryplus(frame, left);
+        if(result)
+          push(result);
+        else
+          set_except("unsupported operand for unary +");
+        vm_continue();
+      }
       vm_target(IRETURN) {
-        if(!empty()) 
+        if(getflag() && !empty())
           retval = pop();
         goto exit;
       }
       vm_target(IPRINT) {
         result = pop();
         como_object_print(result);
+        fputc('\n', stdout);
+        vm_continue();
+      }
+      vm_target(EQUAL) {
+        right = pop();
+        left  = pop();
+        result = isequal(frame, left, right);
+        push(result);
+        vm_continue();
+      }
+      vm_target(NEQUAL) {
+        right = pop();
+        left  = pop();
+        result = nequal(frame, left, right);
+        push(result);
+        vm_continue();
+      }
+      vm_target(GT) {
+        right = pop();
+        left  = pop();
+        result = isgt(frame, left, right);
+        push(result);
+        vm_continue();
+      }
+      vm_target(LT) {
+        right = pop();
+        left  = pop();
+        result = islt(frame, left, right);
+        push(result);
+        vm_continue();
+      }
+      vm_target(GTE) {
+        right = pop();
+        left  = pop();
+        result = isgte(frame, left, right);
+        push(result);
+        vm_continue();
+      }
+      vm_target(LTE) {
+        right = pop();
+        left  = pop();
+        result = islte(frame, left, right);
+        push(result);
         vm_continue();
       }
     }
@@ -174,8 +360,9 @@ const char *ex = NULL;
   }
 
 exit:
-  fprintf(stderr, "returning from eval loop:\n");
-  fprintf(stderr, "sp=%ld\n", frame->sp);
+  while(!empty())
+    (void)pop();
+
   return retval;  
 }
 
@@ -203,6 +390,7 @@ static void do_gc(como_frame *frame)
       root = next;
     }
     else {
+      /* This object is unreachable */
       root->flags = 1;
       /* else set this object to marked, 
          and go backt to top to hit top branch 
@@ -222,13 +410,23 @@ int main(void)
   emit(mainframe, IADD,       0, 0);
   emit(mainframe, STORE_NAME, str_const(mainframe, "sum"), 0);
   emit(mainframe, LOAD_NAME,  str_const(mainframe, "sum"), 0);
+  emit(mainframe, LOAD_CONST, int_const(mainframe, 5),     0);
+  emit(mainframe, ITIMES,     0, 0);
+  emit(mainframe, LOAD_CONST, int_const(mainframe, 100),   0);
+  emit(mainframe, EQUAL,      0, 0);
+  emit(mainframe, IPRINT,     0, 0);
+  emit(mainframe, LOAD_CONST, dbl_const(mainframe, 2.455), 0);
+  emit(mainframe, LOAD_CONST, int_const(mainframe, 2),     0);
+  emit(mainframe, IREM,       0, 0);
   emit(mainframe, IPRINT,     0, 0);
   emit(mainframe, IRETURN,    0, 0);
 
   como_object *result = como_frame_eval(mainframe);
 
-  if(result)
+  if(result) {
+    printf("return val: ");
     como_object_print(result);
+  }
 
   do_gc(mainframe);
   como_frame_dtor(mainframe);

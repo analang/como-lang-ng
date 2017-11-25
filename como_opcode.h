@@ -61,8 +61,14 @@ typedef struct ComoOpCode
 #define IAND                            0x24
 #define CREATE_ARRAY                    0x25
 #define GET_FIELD                       0x26
-#define LOAD_STRING                     0x27
-#define COMO_OPCODE_MAX                 0x28
+#define UNARY_PLUS                      0x27
+#define EQUAL                           0x28
+#define NEQUAL                          0x29
+#define GT                              0x30
+#define LT                              0x31
+#define GTE                             0x32
+#define LTE                             0x33
+#define COMO_OPCODE_MAX                 0x34
 
 extern const char * const str_opcodelist[];
 
