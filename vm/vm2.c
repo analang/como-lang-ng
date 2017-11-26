@@ -157,20 +157,7 @@ static como_object *isgte(como_frame *f, como_object *a, como_object *b)
 /* C truthness */
 static int truthy(como_object *a) 
 {
-  if(como_type_is(a, como_long_type))
-    return ((como_long *)a)->value != 0;
-  else if(como_type_is(a, como_double_type))
-    return ((como_double *)a)->value != 0.0;
-  else if(como_type_is(a, como_string_type))
-    return ((como_string *)a)->len != 0;
-  else if(como_type_is(a, como_map_type))
-    return como_get_container(a)->size != 0;
-  else if(como_type_is(a, como_array_type))
-    return como_get_container(a)->size != 0;
-  else if(como_type_is(a, como_bool_type))
-    return como_get_bool(a)->value != 0;
-  else
-    return 1;
+  return a->type->obj_bool(a) != 0;
 }
 
 
@@ -229,8 +216,8 @@ const char *ex = NULL;
 #define set_except(x) \
   ex = x;
 
-  top:
   for(;;) {
+    top:
     vm_case(fetch()) {
       vm_target(JMP) {
         frame->pc = get_arg();
@@ -239,7 +226,7 @@ const char *ex = NULL;
       vm_target(JZ) {
         result = pop();
         if(!truthy(result)) {
-          frame->pc = get_arg();
+          frame->pc = (como_size_t)get_arg();
           goto top;
         }
         vm_continue();
@@ -333,6 +320,7 @@ const char *ex = NULL;
         vm_continue();
       }
       vm_target(IRETURN) {
+        /* getflag() determine if the frame is returning a value */
         if(getflag() && !empty())
           retval = pop();
         goto exit;
@@ -438,7 +426,19 @@ int main(void)
 {
 
   como_frame *mainframe = como_frame_new("main");
-
+  
+  /*
+   * sum = 15 + 15;
+   * print(sum * 5 == 100);
+   * print(2.455 % 2);
+   * if(sum == 30)
+   * {
+   *    print("sum is 30");
+   * }
+   * print("returning from main");
+   * return;
+   }
+   */
   emit(mainframe, LOAD_CONST, int_const(mainframe, 15), 0);
   emit(mainframe, LOAD_CONST, int_const(mainframe, 5),  0);
   emit(mainframe, IADD,       0, 0);
@@ -452,6 +452,17 @@ int main(void)
   emit(mainframe, LOAD_CONST, dbl_const(mainframe, 2.455), 0);
   emit(mainframe, LOAD_CONST, int_const(mainframe, 2),     0);
   emit(mainframe, IREM,       0, 0);
+  emit(mainframe, IPRINT,     0, 0);
+  emit(mainframe, LOAD_CONST, int_const(mainframe, 30),    0);
+  emit(mainframe, LOAD_NAME,  str_const(mainframe, "sum"), 0);
+  emit(mainframe, EQUAL,      0, 0);
+  /* Jump target is always X many instructions forward to the target 
+     instruction 
+  */
+  emit(mainframe, JZ,         como_container_size(mainframe->code) + 3, 0);
+  emit(mainframe, LOAD_CONST, str_const(mainframe, "sum is 30"),      0);
+  emit(mainframe, IPRINT,     0, 0);
+  emit(mainframe, LOAD_CONST, str_const(mainframe, "returning from main"), 0);
   emit(mainframe, IPRINT,     0, 0);
   emit(mainframe, IRETURN,    0, 0);
 
