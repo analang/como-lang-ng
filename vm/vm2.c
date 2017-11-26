@@ -160,6 +160,8 @@ static int truthy(como_object *a)
   return a->type->obj_bool(a) != 0;
 }
 
+static void do_gc(como_frame *frame);
+
 
 #define int_const(frame, value) \
   (como_array_push(frame->constants, gc_new(frame, como_longfromlong(value))), \
@@ -376,7 +378,32 @@ const char *ex = NULL;
     }
 
     if(ex) {
-      fprintf(stdout, "Exception: %s\n", ex);
+      /* Find the exception handler */
+      como_size_t cpc = frame->pc;
+      while(--cpc)
+      {
+        como_uint32_t opline;
+        opline = como_code_get(frame->code, cpc);
+        if(((opline >> 24) & 0xff) == TRY)
+        {
+          frame->pc = (opline >> 8) & 0xffff;
+          
+          /* Now, determine what the variable name is for the catch statement */
+
+          como_uint32_t nextop = como_code_get(frame->code, frame->pc + 1);
+          if(((nextop >> 24) & 0xff) == LOAD_NAME)
+          {
+            fprintf(stderr, "next op is LOAD_NAME\n");
+            como_size_t constindex = (nextop >> 8) & 0xffff;
+            como_object *name = get_const(constindex);
+            como_map_put(frame->locals, name, gc_new(frame, como_stringfromstring(
+              (char *)ex)));
+          }
+          ex = NULL;
+          goto top;
+        }
+      }
+      fprintf(stdout, "como: fatal, unhandled exception: %s\n", ex);
       goto exit;
     }
   }
@@ -436,8 +463,28 @@ int main(void)
    *    print("sum is 30");
    * }
    * print("returning from main");
-   * return;
-   }
+   * 
+   * try 
+   * {
+   *    name = "This" - "This";
+   * }
+   * catch(e)
+   * {
+   *    print(e);
+   * }
+   *
+   *
+   *
+   */
+  /*
+   * BEGIN_TRY <CATCH_TARGET>
+   *
+   *
+   *
+   * CATCH
+   *
+   *
+   * END_TRY
    */
   emit(mainframe, LOAD_CONST, int_const(mainframe, 15), 0);
   emit(mainframe, LOAD_CONST, int_const(mainframe, 5),  0);
@@ -462,9 +509,19 @@ int main(void)
   emit(mainframe, JZ,         como_container_size(mainframe->code) + 3, 0);
   emit(mainframe, LOAD_CONST, str_const(mainframe, "sum is 30"),      0);
   emit(mainframe, IPRINT,     0, 0);
+
+
+
+  emit(mainframe, TRY,        como_container_size(mainframe->code) + 4, 0);
+  emit(mainframe, LOAD_CONST, str_const(mainframe, "This"),             0);
+  emit(mainframe, LOAD_CONST, str_const(mainframe, "This"),             0);
+  emit(mainframe, IMINUS,    0, 0);
+  emit(mainframe, CATCH,     0, 0);
+  emit(mainframe, LOAD_NAME, str_const(mainframe, "e"), 0);
+  emit(mainframe, IPRINT,    0, 0);
   emit(mainframe, LOAD_CONST, str_const(mainframe, "returning from main"), 0);
   emit(mainframe, IPRINT,     0, 0);
-  emit(mainframe, IRETURN,    0, 0);
+  emit(mainframe, IRETURN,   0, 0);
 
   como_object *result = como_frame_eval(mainframe);
 
