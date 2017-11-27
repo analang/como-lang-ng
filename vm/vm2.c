@@ -541,9 +541,11 @@ int main(void)
   emit(mainframe, CATCH,     0, 0);
   emit(mainframe, LOAD_NAME, str_const(mainframe, "e"), 0);
   emit(mainframe, IPRINT,    0, 0);
-  emit(mainframe, LOAD_CONST, str_const(mainframe, "returning from main"), 0);
+  emit(mainframe, LOAD_CONST, str_const(mainframe, "returning "), 0);
+  emit(mainframe, LOAD_CONST, str_const(mainframe, "from main"), 0);
+  emit(mainframe, IADD,       0, 0);
   emit(mainframe, IPRINT,     0, 0);
-  emit(mainframe, IRETURN,   0, 0);
+  emit(mainframe, IRETURN,    0, 0);
 
   como_object *result = como_frame_eval(mainframe);
 
