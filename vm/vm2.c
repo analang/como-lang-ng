@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <limits.h>
 #include <como.h>
 
 #include "../como_opcode.h"
@@ -389,11 +390,9 @@ const char *ex = NULL;
           frame->pc = (opline >> 8) & 0xffff;
           
           /* Now, determine what the variable name is for the catch statement */
-
           como_uint32_t nextop = como_code_get(frame->code, frame->pc + 1);
           if(((nextop >> 24) & 0xff) == LOAD_NAME)
           {
-            fprintf(stderr, "next op is LOAD_NAME\n");
             como_size_t constindex = (nextop >> 8) & 0xffff;
             como_object *name = get_const(constindex);
             como_map_put(frame->locals, name, gc_new(frame, como_stringfromstring(
@@ -467,6 +466,7 @@ int main(void)
    * try 
    * {
    *    name = "This" - "This";
+   *    print("not reached...");
    * }
    * catch(e)
    * {
@@ -506,16 +506,35 @@ int main(void)
   /* Jump target is always X many instructions forward to the target 
      instruction 
   */
+
+  if((como_container_size(mainframe->code) + 6) > USHRT_MAX)
+  {
+    fprintf(stderr, "como: fatal error, jump target is too big, requested: "
+      "%ld, max: %hu", como_container_size(mainframe->code) + 6, USHRT_MAX);
+
+    exit(1);
+  }
+  
   emit(mainframe, JZ,         como_container_size(mainframe->code) + 3, 0);
   emit(mainframe, LOAD_CONST, str_const(mainframe, "sum is 30"),      0);
   emit(mainframe, IPRINT,     0, 0);
 
 
 
-  emit(mainframe, TRY,        como_container_size(mainframe->code) + 4, 0);
+  if((como_container_size(mainframe->code) + 6) > USHRT_MAX)
+  {
+    fprintf(stderr, "como: fatal error, jump target is too big, requested: "
+      "%ld, max: %hu", como_container_size(mainframe->code) + 6, USHRT_MAX);
+
+    exit(1);
+  }
+
+  emit(mainframe, TRY,        como_container_size(mainframe->code) + 6, 0);
   emit(mainframe, LOAD_CONST, str_const(mainframe, "This"),             0);
   emit(mainframe, LOAD_CONST, str_const(mainframe, "This"),             0);
-  emit(mainframe, IMINUS,    0, 0);
+  emit(mainframe, ITIMES,    0, 0);
+  emit(mainframe, LOAD_CONST, str_const(mainframe, "not reached..."), 0);
+  emit(mainframe, IPRINT,    0, 0);
   emit(mainframe, CATCH,     0, 0);
   emit(mainframe, LOAD_NAME, str_const(mainframe, "e"), 0);
   emit(mainframe, IPRINT,    0, 0);
