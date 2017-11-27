@@ -163,7 +163,10 @@ static int truthy(como_object *a)
 
 static void do_gc(como_frame *frame);
 
-
+/*
+ * TODO, currently max index is USHRT_MAX, but there are no checks for that
+ * limit...
+ */
 #define int_const(frame, value) \
   (como_array_push(frame->constants, gc_new(frame, como_longfromlong(value))), \
   (como_container_size(frame->constants) - 1))
@@ -514,7 +517,7 @@ int main(void)
 
     exit(1);
   }
-  
+
   emit(mainframe, JZ,         como_container_size(mainframe->code) + 3, 0);
   emit(mainframe, LOAD_CONST, str_const(mainframe, "sum is 30"),      0);
   emit(mainframe, IPRINT,     0, 0);
