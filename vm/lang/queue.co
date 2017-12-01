@@ -1,0 +1,18 @@
+import system.logger
+import math;
+
+class Queue {
+  
+  public function Queue() {
+    this.logger = logger.Log("Queue");
+    this.items  = [];
+  }
+
+  public function clear() {
+    this.items = [];
+  }
+
+  public function enqueue() {
+    this.items.push(item);
+  }
+}

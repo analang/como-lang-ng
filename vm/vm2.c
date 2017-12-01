@@ -1,8 +1,24 @@
 #include <assert.h>
 #include <limits.h>
 #include <como.h>
+#include <stdarg.h>
+
+#define COMO_DEBUG 1
+#include "como_debug.h"
 
 #include "../como_opcode.h"
+
+/* Physical location tracking for debugging*/
+typedef struct _como_mem_tracker {
+  const char *file;
+  const char *fn;
+  int line;
+  void *addr;
+  struct _como_mem_tracker *next;
+  int flags;
+} como_mem_tracker;
+
+static int gc_on = 0;
 
 typedef struct _como_frame {
   como_object *name; 
@@ -15,7 +31,13 @@ typedef struct _como_frame {
   como_size_t pc;
   como_size_t sz;
   como_size_t sp;
+  como_size_t nobjs;
+  como_size_t nobjslt;
+  como_mem_tracker *mtrack;
 } como_frame;
+
+static void do_gc(como_frame *frame);
+
 
 /* TODO, since functions can be stored as names,
   I should create a function_object, (a subclass of como_object
@@ -31,6 +53,13 @@ static void como_frame_dtor(como_frame *f)
   como_object_dtor(f->constants);
   como_object_dtor(f->locals);
 
+  como_mem_tracker *mtrack = f->mtrack;
+  while(mtrack) {
+    como_mem_tracker *next = mtrack->next;
+    free(mtrack);
+    mtrack = next;
+  }
+
   free(f->stack);
   free(f);
 }
@@ -44,11 +73,13 @@ static como_frame *como_frame_new(char *name)
   f->constants = como_array_new(8);
   f->locals    = como_map_new(8);
   f->stack     = malloc(sizeof(como_object *) * 255);
-  
+  f->mtrack    = NULL;
   f->pc        = 0;
   f->sp        = 0; 
   f->sz        = 255;
   f->root      = NULL;
+  f->nobjs     = 0;
+  f->nobjslt   = 0;
 
   int i;
   for(i = 0; i < 255; i++)
@@ -66,20 +97,81 @@ static void should_grow(como_frame *frame)
   }
 }
 
-static como_object *gc_new(como_frame *frame, como_object *obj)
+#define gc_new(frame, obj) \
+  gc_new_ex(frame, obj, __FUNCTION__, __FILE__, __LINE__)
+
+static como_object *gc_new_ex(
+  como_frame *frame, como_object *obj, const char *fn, const char *file, int lineno)
 {
+  frame->nobjslt++;
+
+  como_debug("tracking object %p, total objects tracked is now %ld",
+    (void *)obj, frame->nobjslt); 
+
+  /* Internal checking for sanity checks*/
+  como_mem_tracker *tracker = frame->mtrack;
+  while(tracker)
+  {
+    if(tracker->addr == (void *)obj)
+    {
+      como_error_noreturn(
+        "double tracking detected, address %p, first allocated on line %d in %s, "
+        "attempted allocation on line %d in %s",
+        (void *)obj, tracker->line, tracker->fn, lineno, fn);
+    }
+    tracker = tracker->next;
+  }
+
+  como_mem_tracker *mtracked = malloc(sizeof(como_mem_tracker));
+  mtracked->line = lineno;
+  mtracked->file = file;
+  mtracked->addr = (void *)obj;
+  mtracked->flags = 0;
+  mtracked->fn = fn;
+  mtracked->next = frame->mtrack;
+  frame->mtrack = mtracked;
+
+  como_object *str = obj->type->obj_str(obj);
+
+  como_debug("\t%p is of type %s with value `%s`",
+    (void *)obj, como_type_name(obj), ((como_string *)str)->value);
+  como_debug("\t\tallocated on line %d", lineno);
+
+  como_object_dtor(str);
+
+  if(frame->nobjs == 2)
+  {
+    if(gc_on) {
+      como_warning("running gc on current frame");
+      do_gc(frame);
+    }
+  }
+
   obj->next = frame->root;
   obj->flags = 0;
 
   frame->root = obj;
+
+  frame->nobjs++;
 
   return obj;
 }
 
 static como_object *add(como_frame *f, como_object *a, como_object *b)
 {
-  if(a->type->obj_binops != NULL && a->type->obj_binops->obj_add != NULL)
-    return gc_new(f, a->type->obj_binops->obj_add(a, b));
+  if(a->type->obj_binops != NULL && a->type->obj_binops->obj_add != NULL) {
+    como_object *result = a->type->obj_binops->obj_add(a, b);
+    
+    como_debug("result of " COMO_PTR_FMT "->type->obj_binops->obj_add(" COMO_PTR_FMT
+      "," COMO_PTR_FMT ")",
+      COMO_PTR(a), COMO_PTR(a), COMO_PTR(b));
+
+    como_debug("\tis %p", (void *)result);
+
+    assert((void *)result != (void *)b);  
+
+    return gc_new(f, result);
+  }
   return NULL;
 }
 
@@ -161,7 +253,22 @@ static int truthy(como_object *a)
   return a->type->obj_bool(a) != 0;
 }
 
-static void do_gc(como_frame *frame);
+static char *make_except(const char *fmt, ...)
+{
+  char *buffer = NULL;
+  int size = 0;
+  va_list args;
+
+  va_start (args, fmt);
+  size = snprintf(buffer, size, fmt, args);
+  size++;
+  buffer = malloc(size);
+  snprintf(buffer, size, fmt, args);
+  buffer[size - 1] = '\0';
+  va_end (args);
+
+  return buffer;
+}
 
 /*
  * TODO, currently max index is USHRT_MAX, but there are no checks for that
@@ -217,13 +324,15 @@ static como_object *como_frame_eval(como_frame *frame)
 como_object *arg;
 como_object *retval = NULL;
 como_object *left, *right, *result;
-const char *ex = NULL;
+char *ex = NULL;
 
-#define set_except(x) \
-  ex = x;
+#define set_except(fmt, ...) \
+  ex = make_except(fmt, ##__VA_ARGS__)
 
   for(;;) {
     top:
+    /* Reset result */
+    result = NULL;
     vm_case(fetch()) {
       vm_target(JMP) {
         frame->pc = get_arg();
@@ -246,6 +355,7 @@ const char *ex = NULL;
         arg = get_const(get_arg());
         result = pop();
         como_map_put(frame->locals, arg, result);
+        push(result);
         vm_continue();
       }
       vm_target(LOAD_NAME){
@@ -253,8 +363,10 @@ const char *ex = NULL;
         result = como_map_get(frame->locals, arg);
         if(result)
           push(result);
-        else
-          set_except("NameError, undefined variable");
+        else {
+          set_except("NameError, undefined variable `%s`", 
+            ((como_string *)arg)->value);
+        }
         vm_continue();
       }
       vm_target(IADD) {
@@ -401,11 +513,14 @@ const char *ex = NULL;
             como_map_put(frame->locals, name, gc_new(frame, como_stringfromstring(
               (char *)ex)));
           }
+          free(ex);
           ex = NULL;
           goto top;
         }
       }
       fprintf(stdout, "como: fatal, unhandled exception: %s\n", ex);
+      free(ex);
+      ex = NULL;
       goto exit;
     }
   }
@@ -421,33 +536,79 @@ exit:
 static void do_gc(como_frame *frame)
 {
   /* Mark */
+  como_debug("frame->sp=%ld", frame->sp);
   int i;
-  for(i = 0; i < frame->sz; i++)
+  for(i = 0; i < frame->sp; i++)
   {
     como_object *obj = frame->stack[i];
 
-    if(obj)
+    if(obj) {
       obj->flags = 1;
+    }
   }
-  /* Sweep */
-  como_object *root = frame->root;
 
-  while(root != NULL)
+  /* Sweep */
+  como_object **root = &frame->root;
+  como_size_t numobjects = frame->nobjs;
+  int nnodes = 0;
+  como_object *tmp = frame->root;
+  while(tmp)
   {
-    como_object *next = root->next;
-    /* if this object is marked, free it and set root to next */
-    if(root->flags) {
-      como_object_dtor(root); 
-      root = next;
+    nnodes++;
+    tmp = tmp->next;
+  }
+
+  como_debug("entering sweep loop, root is at %p with %d children", 
+    (void *)(*root), nnodes);
+
+  while(*root)
+  {
+    if(!((*root)->flags)) {
+      como_object *unreached = *root;
+      *root = unreached->next;
+      /* Check if this has been freed already */
+      como_mem_tracker *tracker = frame->mtrack;
+      while(tracker) {
+        if(tracker->addr == (void *)unreached) {
+          como_debug("found address %p in memory location tracker, flags=%d",
+            (void *)unreached, tracker->flags);
+          break; 
+        }
+        tracker = tracker->next;
+      }
+
+      if(tracker->flags) {
+        printf("double free of %p, allocated on line %d",
+          tracker->addr, tracker->line);
+      }
+
+      como_warning("como_object_dtor(%p)", (void *)unreached);
+      como_object_dtor(unreached);  
+      tracker->flags = 1;
+      frame->nobjs--;
     }
     else {
-      /* This object is unreachable */
-      root->flags = 1;
-      /* else set this object to marked, 
-         and go backt to top to hit top branch 
-         */
+      como_debug("setting %p to unreachable", (void *)(*root));
+      (*root)->flags = 0;
+      root = &(*root)->next;
     }
   }
+  
+  nnodes = 0;
+  tmp = frame->root;
+  while(tmp)
+  {
+    nnodes++;
+    tmp = tmp->next;
+  }
+
+  if(frame->root != NULL) {
+   como_debug("leaving sweep loop, root is at %p with %d children",
+    (void *)frame->root, nnodes);
+  }
+
+  como_debug("collected %ld objects, %ld remaining", 
+    numobjects - frame->nobjs, frame->nobjs);
 }
 
 
@@ -489,10 +650,15 @@ int main(void)
    *
    * END_TRY
    */
+  /*
+   * print(sum = 15 + 5)
+   */
   emit(mainframe, LOAD_CONST, int_const(mainframe, 15), 0);
   emit(mainframe, LOAD_CONST, int_const(mainframe, 5),  0);
   emit(mainframe, IADD,       0, 0);
   emit(mainframe, STORE_NAME, str_const(mainframe, "sum"), 0);
+  emit(mainframe, IPRINT,     0, 0);
+  emit(mainframe, IRETURN,    0, 0);
   emit(mainframe, LOAD_NAME,  str_const(mainframe, "sum"), 0);
   emit(mainframe, LOAD_CONST, int_const(mainframe, 5),     0);
   emit(mainframe, ITIMES,     0, 0);
@@ -506,38 +672,12 @@ int main(void)
   emit(mainframe, LOAD_CONST, int_const(mainframe, 30),    0);
   emit(mainframe, LOAD_NAME,  str_const(mainframe, "sum"), 0);
   emit(mainframe, EQUAL,      0, 0);
-  /* Jump target is always X many instructions forward to the target 
-     instruction 
-  */
-
-  if((como_container_size(mainframe->code) + 6) > USHRT_MAX)
-  {
-    fprintf(stderr, "como: fatal error, jump target is too big, requested: "
-      "%ld, max: %hu", como_container_size(mainframe->code) + 6, USHRT_MAX);
-
-    exit(1);
-  }
-
-  emit(mainframe, JZ,         como_container_size(mainframe->code) + 3, 0);
-  emit(mainframe, LOAD_CONST, str_const(mainframe, "sum is 30"),      0);
-  emit(mainframe, IPRINT,     0, 0);
-
-
-
-  if((como_container_size(mainframe->code) + 6) > USHRT_MAX)
-  {
-    fprintf(stderr, "como: fatal error, jump target is too big, requested: "
-      "%ld, max: %hu", como_container_size(mainframe->code) + 6, USHRT_MAX);
-
-    exit(1);
-  }
-
   emit(mainframe, TRY,        como_container_size(mainframe->code) + 6, 0);
+  emit(mainframe, LOAD_CONST, str_const(mainframe, "This "),             0);
   emit(mainframe, LOAD_CONST, str_const(mainframe, "This"),             0);
-  emit(mainframe, LOAD_CONST, str_const(mainframe, "This"),             0);
-  emit(mainframe, ITIMES,    0, 0);
-  emit(mainframe, LOAD_CONST, str_const(mainframe, "not reached..."), 0);
+  emit(mainframe, IADD,    0, 0);
   emit(mainframe, IPRINT,    0, 0);
+  emit(mainframe, JMP,       como_container_size(mainframe->code) + 4, 0);
   emit(mainframe, CATCH,     0, 0);
   emit(mainframe, LOAD_NAME, str_const(mainframe, "e"), 0);
   emit(mainframe, IPRINT,    0, 0);
@@ -546,13 +686,11 @@ int main(void)
   emit(mainframe, IADD,       0, 0);
   emit(mainframe, IPRINT,     0, 0);
   emit(mainframe, IRETURN,    0, 0);
+  
+  /* We can't start running the GC until the program is executing */
+  gc_on = 1;
 
-  como_object *result = como_frame_eval(mainframe);
-
-  if(result) {
-    printf("return val: ");
-    como_object_print(result);
-  }
+  (void)como_frame_eval(mainframe);
 
   do_gc(mainframe);
   como_frame_dtor(mainframe);
