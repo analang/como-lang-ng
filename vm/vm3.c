@@ -2,13 +2,18 @@
 #include <limits.h>
 #include <como.h>
 #include <stdarg.h> 
+#include <signal.h>
 
 #define COMO_WARNING 1
+
 #include "como_debug.h"
 
 #include "../como_opcode.h"
 
+
 static int gc_on = 0;
+static int inter_total = 0;
+static volatile sig_atomic_t inter = 0;
 
 static void do_gc(como_frame *frame);
 static void dump_locals(como_frame *frame);
@@ -27,7 +32,7 @@ static como_object *gc_new_ex(
 {  
   frame->nobjslt++;
 
-#if COMO_WARNING
+#ifdef COMO_WARNING
   como_object *str = obj->type->obj_str(obj);
   como_warning("\t%p is of type %s with value `%s`",
     (void *)obj, como_type_name(obj), ((como_string *)str)->value);
@@ -148,6 +153,12 @@ static char *make_except(const char *fmt, ...)
   return buffer;
 }
 
+static void sighandler(int sig)
+{
+  signal(SIGINT, SIG_IGN);
+  inter = 1;
+}
+
 #define int_const(frame, value) \
   (como_array_push(frame->constants, gc_new(frame, como_longfromlong(value))), \
   (como_container_size(frame->constants) - 1))
@@ -236,6 +247,16 @@ if(!frameready)
 
   for(;;) {
     top:
+    if(inter) {
+      inter_total++;
+      if(inter_total == 2)
+        goto exit;
+
+      fprintf(stdout, "Keyboard interupt, type ctrl^c again to exit\n");
+      inter = 0; 
+      signal(SIGINT, sighandler);
+    }
+
     /* Reset result */
     result = NULL;
     vm_case(fetch()) {
@@ -442,9 +463,7 @@ if(!frameready)
         if(como_type_is(callable, como_frame_type)) 
         {
           int totalargs = get_arg();
-          printf("total args is %d\n", totalargs);
           como_frame *function = (como_frame *)callable;
-          printf("frame object at %p\n", (void *)function);
           como_frame *oldframe = frame;
 
           while(totalargs--)
@@ -452,16 +471,10 @@ if(!frameready)
             como_object *thearg = pop();
             frame = function;
             push(thearg);
-            printf("pushing arg onto frame ");
-            como_object_print(thearg);
-            fputc('\n', stdout);
             frame = oldframe;
           }
 
-          printf("calling\n");
-          printf("stack size for new call is %ld\n", function->sp);
           como_object *res = como_frame_eval(function, 0);
-          printf("returned\n");
 
           if(res)
             push(res);
@@ -632,6 +645,7 @@ int main(void)
   /* return $pop() + $pop(); */
   emit(addfunction, IADD,    0, 0);
   emit(addfunction, STORE_NAME, str_const(addfunction, "result"), 0);
+  emit(addfunction, JMP,     2, 0);
   emit(addfunction, IRETURN, 0, 1);
 
   como_map_put(frame->locals, 
@@ -641,6 +655,7 @@ int main(void)
   #include "program.c"
 
   gc_on = 1;
+  signal(SIGINT, sighandler);
   como_object *retval = como_frame_eval(frame, 1);
 
   if(retval)
@@ -653,6 +668,9 @@ int main(void)
     como_object_dtor(retval);
   }
 
+  /* since this global frame is special, C needs to control this rather than the VM
+     because the first frame isn't added to Como's Gc
+  */
   como_object_dtor(frame);
 
   return 0;
