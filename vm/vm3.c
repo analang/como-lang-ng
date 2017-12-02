@@ -35,9 +35,11 @@ static como_object *gc_new_ex(
   como_object_dtor(str);
 #endif
 
-  if(frame->nobjs >= frame->mxobjs)
+  if(frame->nobjs >= frame->mxobjs) {
+    como_warning("reached threshold, running do_gc");
     if(gc_on)
       do_gc(frame);
+  }
 
   obj->next = frame->root;
   obj->flags = initrefcount;
@@ -182,9 +184,19 @@ static char *make_except(const char *fmt, ...)
 #define decref(o) --o->flags
 #endif
 
+#ifdef COMO_WARNING
+#define incref(o) do { \
+    como_size_t prev = o->flags; \
+    ++o->flags; \
+    como_warning("incref for %p, old is %ld, new is %ld", (void *)o, prev, \
+      o->flags); \
+    como_warning("\tat %s %d", __FUNCTION__, __LINE__); \
+} while(0)
+#else
 #define incref(o) o->flags++
+#endif
 
-static como_object *como_frame_eval(como_frame *frame)
+static como_object *como_frame_eval(como_frame *frame, int frameready)
 {
 #define vm_case(o) switch(o)
 
@@ -216,7 +228,8 @@ como_object *retval = NULL;
 como_object *left, *right, *result;
 char *ex = NULL;
 
-((como_object *)frame)->type->obj_init((como_object *)frame);
+if(!frameready)
+  ((como_object *)frame)->type->obj_init((como_object *)frame);
 
 #define set_except(fmt, ...) \
   ex = make_except(fmt, ##__VA_ARGS__)
@@ -267,6 +280,7 @@ char *ex = NULL;
       vm_target(IADD) {
         right = pop();
         left  = pop();
+
         result = add(frame, left, right);
         
         decref(right);
@@ -423,6 +437,44 @@ char *ex = NULL;
         decref(left);
         vm_continue();
       }
+      vm_target(CALL) {
+        como_object *callable = pop();
+        if(como_type_is(callable, como_frame_type)) 
+        {
+          int totalargs = get_arg();
+          printf("total args is %d\n", totalargs);
+          como_frame *function = (como_frame *)callable;
+          printf("frame object at %p\n", (void *)function);
+          como_frame *oldframe = frame;
+
+          while(totalargs--)
+          {
+            como_object *thearg = pop();
+            frame = function;
+            push(thearg);
+            printf("pushing arg onto frame ");
+            como_object_print(thearg);
+            fputc('\n', stdout);
+            frame = oldframe;
+          }
+
+          printf("calling\n");
+          printf("stack size for new call is %ld\n", function->sp);
+          como_object *res = como_frame_eval(function, 0);
+          printf("returned\n");
+
+          if(res)
+            push(res);
+        }
+        else
+        {
+          set_except("value is not callable");
+        }
+
+        decref(callable);
+
+        vm_continue();
+      }
     }
 
     if(ex) {
@@ -471,8 +523,6 @@ exit:
 
   do_gc(frame);
 
-  como_object_dtor((como_object *)frame);
-
   return retval; 
 }
 
@@ -492,8 +542,9 @@ static void dump_locals(como_frame *frame)
       como_object *key = bucket->key->type->obj_str(bucket->key);
       como_object *value = bucket->value->type->obj_str(bucket->value);
 
-      como_warning("\t%s(rc=%ld): %s(rc=%ld), ", ((como_string *)key)->value,  
-        bucket->key->flags, ((como_string *)value)->value, bucket->value->flags);
+      como_warning("\t%s(%p)(rc=%ld): %s(%p)(rc=%ld), ", (
+      (como_string *)key)->value, (void *)(bucket->key), bucket->key->flags, 
+      ((como_string *)value)->value, (void *)(bucket->value), bucket->value->flags);
 
       bucket = bucket->next;
 
@@ -532,7 +583,7 @@ static void do_gc(como_frame *frame)
   #define SHOW_OBJS_LEFT()
 #endif
 
-  como_warning("/// begin gc cycle");
+  como_warning("/// begin gc cycle for frame %s", ((como_string *)frame->name)->value);
   COUNT();
 
   como_object **root = &frame->root;
@@ -545,6 +596,12 @@ static void do_gc(como_frame *frame)
       como_warning("como_object_dtor(%p), refcount=%ld", 
         (void *)unreached, unreached->flags);
       como_object *next = unreached->next;
+      if(unreached->type == &como_frame_type ) {
+        // Since we can't define nested functions, this will only
+        // happen on the global frame I think
+        como_warning("is frame type");
+        do_gc((como_frame *)unreached);
+      }
       como_object_dtor(unreached);
       *root = next;
       frame->nobjs--;
@@ -562,12 +619,28 @@ static void do_gc(como_frame *frame)
 
 int main(void)
 {
-  como_frame *frame = (como_frame *)como_frame_new("__como_start", NULL);
-  
+  /* This is the global frame */
+  como_frame *frame = (como_frame *)como_frame_new(
+    "__como_start", NULL);
+
+/* we need to init this to get access to the symbol table early (bootstrap)*/
+  ((como_object *)frame)->type->obj_init((como_object *)frame);
+
+  como_frame *addfunction = (como_frame *)como_frame_new(
+    "add", (como_object *)frame);
+
+  /* return $pop() + $pop(); */
+  emit(addfunction, IADD,    0, 0);
+  emit(addfunction, IRETURN, 0, 1);
+
+  como_map_put(frame->locals, 
+    gc_new(frame, como_stringfromstring("add")), (
+    gc_new(frame, (como_object *)addfunction)));
+
   #include "program.c"
 
   gc_on = 1;
-  como_object *retval = como_frame_eval(frame);
+  como_object *retval = como_frame_eval(frame, 1);
 
   if(retval)
   {
@@ -578,6 +651,8 @@ int main(void)
     decref(retval);
     como_object_dtor(retval);
   }
+
+  como_object_dtor(frame);
 
   return 0;
 }

@@ -70,7 +70,8 @@ typedef struct ComoOpCode
 #define LTE                             0x33
 #define TRY                             0x34
 #define CATCH                           0x35
-#define COMO_OPCODE_MAX                 0x36
+#define CALL                            0x36
+#define COMO_OPCODE_MAX                 0x37
 
 extern const char * const str_opcodelist[];
 
