@@ -3,7 +3,7 @@
 #include <como.h>
 #include <stdarg.h>
 
-#define COMO_DEBUG 1
+#define COMO_WARNING 1
 #include "como_debug.h"
 
 #include "../como_opcode.h"
@@ -31,8 +31,10 @@ typedef struct _como_frame {
   como_size_t pc;
   como_size_t sz;
   como_size_t sp;
-  como_size_t nobjs;
-  como_size_t nobjslt;
+  como_size_t nobjs;   /* total objects currently */
+  como_size_t nobjslt; /* lifetime allocation count */
+  como_size_t mxobjs;
+  /* block whose starting address is 8-byte aligned or 16-byte aligned */
   como_mem_tracker *mtrack;
 } como_frame;
 
@@ -51,6 +53,18 @@ static void como_frame_dtor(como_frame *f)
   como_object_dtor(f->code);
   /* Each time a function is called, these need to be cleared */
   como_object_dtor(f->constants);
+
+  como_map *map = (como_map *)f->locals;
+  como_size_t i;
+  for(i = 0; i < map->size; i++)
+  {
+    como_map_bucket *bucket = map->buckets[i];
+    while(bucket) {
+      como_object_dtor(bucket->key);
+      bucket = bucket->next;
+    }
+  }
+
   como_object_dtor(f->locals);
 
   como_mem_tracker *mtrack = f->mtrack;
@@ -80,6 +94,7 @@ static como_frame *como_frame_new(char *name)
   f->root      = NULL;
   f->nobjs     = 0;
   f->nobjslt   = 0;
+  f->mxobjs    = 8;
 
   int i;
   for(i = 0; i < 255; i++)
@@ -100,13 +115,18 @@ static void should_grow(como_frame *frame)
 #define gc_new(frame, obj) \
   gc_new_ex(frame, obj, __FUNCTION__, __FILE__, __LINE__)
 
-static como_object *gc_new_ex(
+#define gc_new_noref(frame, obj) \
+  gc_new_noref_ex(frame, obj, __FUNCTION__, __FILE__, __LINE__)
+
+
+static como_object *gc_new_noref_ex(
   como_frame *frame, como_object *obj, const char *fn, const char *file, int lineno)
 {
   frame->nobjslt++;
 
-  como_debug("tracking object %p, total objects tracked is now %ld",
-    (void *)obj, frame->nobjslt); 
+#if 0
+  como_debug("tracking object %p, lifetime total is %ld, current cycle is %ld, max objects is %ld",
+    (void *)obj, frame->nobjslt, frame->nobjs, frame->mxobjs); 
 
   /* Internal checking for sanity checks*/
   como_mem_tracker *tracker = frame->mtrack;
@@ -121,6 +141,8 @@ static como_object *gc_new_ex(
     }
     tracker = tracker->next;
   }
+#endif
+
 
   como_mem_tracker *mtracked = malloc(sizeof(como_mem_tracker));
   mtracked->line = lineno;
@@ -139,16 +161,57 @@ static como_object *gc_new_ex(
 
   como_object_dtor(str);
 
-  if(frame->nobjs == 2)
+  if(frame->nobjs >= frame->mxobjs)
   {
+    como_warning("running gc on current frame (%d)", gc_on);
     if(gc_on) {
-      como_warning("running gc on current frame");
       do_gc(frame);
     }
   }
 
   obj->next = frame->root;
   obj->flags = 0;
+
+  frame->root = obj;
+
+  frame->nobjs++;
+
+  return obj;
+}
+
+static como_object *gc_new_ex(
+  como_frame *frame, como_object *obj, const char *fn, const char *file, int lineno)
+{
+  frame->nobjslt++;
+
+
+  como_mem_tracker *mtracked = malloc(sizeof(como_mem_tracker));
+  mtracked->line = lineno;
+  mtracked->file = file;
+  mtracked->addr = (void *)obj;
+  mtracked->flags = 0;
+  mtracked->fn = fn;
+  mtracked->next = frame->mtrack;
+  frame->mtrack = mtracked;
+
+  como_object *str = obj->type->obj_str(obj);
+
+  como_warning("\t%p is of type %s with value `%s`",
+    (void *)obj, como_type_name(obj), ((como_string *)str)->value);
+  como_warning("\t\tallocated on line %d", lineno);
+
+  como_object_dtor(str);
+
+  if(frame->nobjs >= frame->mxobjs)
+  {
+    como_warning("running gc on current frame (%d)", gc_on);
+    if(gc_on) {
+      do_gc(frame);
+    }
+  }
+
+  obj->next = frame->root;
+  obj->flags = 1;
 
   frame->root = obj;
 
@@ -256,17 +319,13 @@ static int truthy(como_object *a)
 static char *make_except(const char *fmt, ...)
 {
   char *buffer = NULL;
-  int size = 0;
+  int size = 1024;
   va_list args;
 
   va_start (args, fmt);
-  size = snprintf(buffer, size, fmt, args);
-  size++;
-  buffer = malloc(size);
-  snprintf(buffer, size, fmt, args);
-  buffer[size - 1] = '\0';
+  buffer = malloc(size + 1);
+  vsnprintf(buffer, size, fmt, args);
   va_end (args);
-
   return buffer;
 }
 
@@ -281,6 +340,11 @@ static char *make_except(const char *fmt, ...)
 #define str_const(frame, value) \
   (como_array_push(frame->constants, gc_new(frame, como_stringfromstring(value))), \
   (como_container_size(frame->constants) - 1))
+
+#define str_const_noref(frame, value) \
+  (como_array_push(frame->constants, gc_new_noref(frame, como_stringfromstring(value))), \
+  (como_container_size(frame->constants) - 1))
+
 
 #define dbl_const(frame, value) \
   (como_array_push(frame->constants, gc_new(frame, como_doublefromdouble(value))), \
@@ -321,6 +385,12 @@ static como_object *como_frame_eval(como_frame *frame)
 
 #define getflag() (((como_code_get(frame->code, frame->pc -1)) & 0xff))
 
+#define decref(o) do { \
+  --o->flags; \
+} while(0);
+
+#define incref(o) o->flags++
+
 como_object *arg;
 como_object *retval = NULL;
 como_object *left, *right, *result;
@@ -355,26 +425,34 @@ char *ex = NULL;
         arg = get_const(get_arg());
         result = pop();
         como_map_put(frame->locals, arg, result);
+        decref(arg);
+        incref(result);
         push(result);
         vm_continue();
       }
       vm_target(LOAD_NAME){
         arg = get_const(get_arg());
         result = como_map_get(frame->locals, arg);
-        if(result)
+        if(result) {
           push(result);
-        else {
-          set_except("NameError, undefined variable `%s`", 
-            ((como_string *)arg)->value);
         }
+        else {
+          set_except("NameError, undefined variable `%s`", ((como_string *)arg)->value);
+        }
+        decref(arg);
         vm_continue();
       }
       vm_target(IADD) {
         right = pop();
         left  = pop();
         result = add(frame, left, right);
-        if(result)
+        
+        decref(right);
+        decref(left);
+
+        if(result) {
           push(result);
+        }
         else
           set_except("unsupported operands for + operator");
         vm_continue();
@@ -383,8 +461,13 @@ char *ex = NULL;
         right = pop();
         left  = pop();
         result = sub(frame, left, right);
-        if(result)
+
+        decref(right);
+        decref(left);
+
+        if(result) {
           push(result);
+        }
         else
           set_except("unsupported operands for - operator");
         vm_continue();
@@ -393,8 +476,13 @@ char *ex = NULL;
         right = pop();
         left  = pop();
         result = mul(frame, left, right);
-        if(result)
+        
+        decref(right);
+        decref(left);
+
+        if(result) {
           push(result);
+        }
         else
           set_except("unsupported operands for * operator");
         vm_continue();      
@@ -403,8 +491,13 @@ char *ex = NULL;
         right = pop();
         left  = pop();
         result = do_div(frame, left, right);
-        if(result)
+
+        decref(right);
+        decref(left);
+
+        if(result) {
           push(result);
+        }
         else
           set_except("unsupported operands for / operator");
         vm_continue();
@@ -413,8 +506,13 @@ char *ex = NULL;
         right = pop();
         left  = pop();
         result = rem(frame, left, right);
-        if(result)
+
+        decref(right);
+        decref(left);
+
+        if(result) {
           push(result);
+        }
         else
           set_except("unsupported operands for % operator");
         vm_continue();         
@@ -439,13 +537,15 @@ char *ex = NULL;
       }
       vm_target(IRETURN) {
         /* getflag() determine if the frame is returning a value */
-        if(getflag() && !empty())
+        if(getflag() && !empty()) {
           retval = pop();
+        }
         goto exit;
       }
       vm_target(IPRINT) {
         result = pop();
         como_object_print(result);
+        decref(result);
         fputc('\n', stdout);
         vm_continue();
       }
@@ -453,6 +553,10 @@ char *ex = NULL;
         right = pop();
         left  = pop();
         result = isequal(frame, left, right);
+
+        decref(right);
+        decref(left);
+
         push(result);
         vm_continue();
       }
@@ -527,7 +631,10 @@ char *ex = NULL;
 
 exit:
   while(!empty())
-    (void)pop();
+    decref(pop());
+
+  do_gc(frame);
+  como_frame_dtor(frame);
 
   return retval;  
 }
@@ -535,80 +642,22 @@ exit:
 
 static void do_gc(como_frame *frame)
 {
-  /* Mark */
-  como_debug("frame->sp=%ld", frame->sp);
-  int i;
-  for(i = 0; i < frame->sp; i++)
-  {
-    como_object *obj = frame->stack[i];
-
-    if(obj) {
-      obj->flags = 1;
-    }
-  }
-
-  /* Sweep */
   como_object **root = &frame->root;
-  como_size_t numobjects = frame->nobjs;
-  int nnodes = 0;
-  como_object *tmp = frame->root;
-  while(tmp)
-  {
-    nnodes++;
-    tmp = tmp->next;
-  }
-
-  como_debug("entering sweep loop, root is at %p with %d children", 
-    (void *)(*root), nnodes);
 
   while(*root)
   {
-    if(!((*root)->flags)) {
+    if((*root)->flags <= 0 ) {
       como_object *unreached = *root;
-      *root = unreached->next;
-      /* Check if this has been freed already */
-      como_mem_tracker *tracker = frame->mtrack;
-      while(tracker) {
-        if(tracker->addr == (void *)unreached) {
-          como_debug("found address %p in memory location tracker, flags=%d",
-            (void *)unreached, tracker->flags);
-          break; 
-        }
-        tracker = tracker->next;
-      }
-
-      if(tracker->flags) {
-        printf("double free of %p, allocated on line %d",
-          tracker->addr, tracker->line);
-      }
-
       como_warning("como_object_dtor(%p)", (void *)unreached);
-      como_object_dtor(unreached);  
-      tracker->flags = 1;
+      como_object *next = unreached->next;
+      como_object_dtor(unreached);
+      *root = next;
       frame->nobjs--;
     }
     else {
-      como_debug("setting %p to unreachable", (void *)(*root));
-      (*root)->flags = 0;
       root = &(*root)->next;
     }
   }
-  
-  nnodes = 0;
-  tmp = frame->root;
-  while(tmp)
-  {
-    nnodes++;
-    tmp = tmp->next;
-  }
-
-  if(frame->root != NULL) {
-   como_debug("leaving sweep loop, root is at %p with %d children",
-    (void *)frame->root, nnodes);
-  }
-
-  como_debug("collected %ld objects, %ld remaining", 
-    numobjects - frame->nobjs, frame->nobjs);
 }
 
 
@@ -653,12 +702,22 @@ int main(void)
   /*
    * print(sum = 15 + 5)
    */
+
+  /*
+   at the end of each frame, destroy all variable names
+   * TODO
+   * separate root for all variable names
+   */
   emit(mainframe, LOAD_CONST, int_const(mainframe, 15), 0);
   emit(mainframe, LOAD_CONST, int_const(mainframe, 5),  0);
   emit(mainframe, IADD,       0, 0);
   emit(mainframe, STORE_NAME, str_const(mainframe, "sum"), 0);
   emit(mainframe, IPRINT,     0, 0);
-  emit(mainframe, IRETURN,    0, 0);
+
+  /* Testing the sumcopy = sum; */
+  emit(mainframe, LOAD_NAME,  str_const(mainframe, "sum"), 0);
+  emit(mainframe, STORE_NAME, str_const(mainframe, "sumcopy"), 0);
+
   emit(mainframe, LOAD_NAME,  str_const(mainframe, "sum"), 0);
   emit(mainframe, LOAD_CONST, int_const(mainframe, 5),     0);
   emit(mainframe, ITIMES,     0, 0);
@@ -670,7 +729,7 @@ int main(void)
   emit(mainframe, IREM,       0, 0);
   emit(mainframe, IPRINT,     0, 0);
   emit(mainframe, LOAD_CONST, int_const(mainframe, 30),    0);
-  emit(mainframe, LOAD_NAME,  str_const(mainframe, "sum"), 0);
+  emit(mainframe, LOAD_CONST, int_const(mainframe, 30),    0);
   emit(mainframe, EQUAL,      0, 0);
   emit(mainframe, TRY,        como_container_size(mainframe->code) + 6, 0);
   emit(mainframe, LOAD_CONST, str_const(mainframe, "This "),             0);
@@ -679,21 +738,24 @@ int main(void)
   emit(mainframe, IPRINT,    0, 0);
   emit(mainframe, JMP,       como_container_size(mainframe->code) + 4, 0);
   emit(mainframe, CATCH,     0, 0);
-  emit(mainframe, LOAD_NAME, str_const(mainframe, "e"), 0);
+  /* all conditional branches, need to have their refs set to 0 */
+  emit(mainframe, LOAD_NAME, str_const_noref(mainframe, "e"), 0);
   emit(mainframe, IPRINT,    0, 0);
+  /* End try block */
   emit(mainframe, LOAD_CONST, str_const(mainframe, "returning "), 0);
   emit(mainframe, LOAD_CONST, str_const(mainframe, "from main"), 0);
   emit(mainframe, IADD,       0, 0);
   emit(mainframe, IPRINT,     0, 0);
-  emit(mainframe, IRETURN,    0, 0);
+  emit(mainframe, IRETURN,    0, 1);
   
   /* We can't start running the GC until the program is executing */
   gc_on = 1;
 
-  (void)como_frame_eval(mainframe);
+  como_object *retval = como_frame_eval(mainframe);
 
-  do_gc(mainframe);
-  como_frame_dtor(mainframe);
+  assert(--retval->flags == 0);
+
+  como_object_dtor(retval);
 
   return 0;
 }

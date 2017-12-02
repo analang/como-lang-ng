@@ -22,7 +22,6 @@
 
 #include "como_debug.h"
 
-#ifdef COMO_HAVE_DEBUG
 void como_warning_ex(const char *f, const char *fn, int ln, 
         const char* format, ...)
 {
@@ -46,7 +45,6 @@ void como_debug_ex(const char *f, const char *fn, int ln,
     fprintf(stderr, ANSI_COLOR_RESET "\n");
     fflush(stderr);	
 }
-#endif
 
 void __attribute__ ((noreturn)) como_error_noreturn_ex(const char *f, 
 

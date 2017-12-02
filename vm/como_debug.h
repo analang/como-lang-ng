@@ -43,19 +43,24 @@ void __attribute__ ((noreturn)) como_error_noreturn_ex(const char *f,
 #define como_debug(format, ...) \
         como_debug_ex(__FILE__, __func__, __LINE__, format, ##__VA_ARGS__)
 
-#define como_warning(format, ...) \
-        como_warning_ex(__FILE__, __func__, __LINE__, format, ##__VA_ARGS__)
-
 void como_debug_ex(const char *f, 
         const char *fn, int ln, const char* format, ...);
+
+#else
+#define como_debug(format, ...)
+#endif
+
+#ifdef COMO_WARNING 
+#define como_warning(format, ...) \
+        como_warning_ex(__FILE__, __func__, __LINE__, format, ##__VA_ARGS__)
 
 void como_warning_ex(const char *f, 
         const char *fn, int ln, const char* format, ...);
 
 #else
-#define como_debug(format, ...)
 #define como_warning(format, ...)
 #endif
+
 
 #define COMO_OOM() do { \
 	como_error_noreturn("out of memory"); \

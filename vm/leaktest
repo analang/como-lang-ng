@@ -1,2 +1,5 @@
 #!/bin/bash
-valgrind --leak-check=full --track-origins=yes $@
+valgrind \
+--track-origins=yes \
+--leak-check=full \
+$@
