@@ -631,6 +631,7 @@ int main(void)
 
   /* return $pop() + $pop(); */
   emit(addfunction, IADD,    0, 0);
+  emit(addfunction, STORE_NAME, str_const(addfunction, "result"), 0);
   emit(addfunction, IRETURN, 0, 1);
 
   como_map_put(frame->locals, 
