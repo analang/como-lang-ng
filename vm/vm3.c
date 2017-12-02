@@ -248,6 +248,7 @@ char *ex = NULL;
         result = pop();
         como_map_put(frame->locals, arg, result);
         push(result);
+        incref(result);
         vm_continue();
       }
       vm_target(LOAD_NAME) {
@@ -260,6 +261,7 @@ char *ex = NULL;
         else {
           set_except("NameError, undefined variable `%s`", ((como_string *)arg)->value);
         }
+        decref(arg);
         vm_continue();
       }
       vm_target(IADD) {
@@ -364,6 +366,7 @@ char *ex = NULL;
       vm_target(IPRINT) {
         result = pop();
         como_object_print(result);
+        decref(result);
         fputc('\n', stdout);
         vm_continue();
       }
@@ -455,12 +458,12 @@ char *ex = NULL;
   }
 
 exit:
-
- // while(!empty())
-//  {
-    //como_object *obj = pop();
-    //decref(obj);
- // }
+  while(!empty()) {
+    como_object *res = pop(); 
+    como_warning("%p was left on the stack, refcount=%ld", (void *)res, 
+      res->flags);
+    decref(res);
+  }
 
   dump_locals(frame);
 
@@ -489,8 +492,8 @@ static void dump_locals(como_frame *frame)
       como_object *key = bucket->key->type->obj_str(bucket->key);
       como_object *value = bucket->value->type->obj_str(bucket->value);
 
-      como_warning("\t%s: %s", ((como_string *)key)->value, 
-        ((como_string *)value)->value);
+      como_warning("\t%s(rc=%ld): %s(rc=%ld), ", ((como_string *)key)->value,  
+        bucket->key->flags, ((como_string *)value)->value, bucket->value->flags);
 
       bucket = bucket->next;
 
@@ -536,7 +539,7 @@ static void do_gc(como_frame *frame)
 
   while(*root)
   {
-    if((*root)->flags <= 0 ) 
+    if(((*root)->flags) <= 0) 
     {
       como_object *unreached = *root;
       como_warning("como_object_dtor(%p), refcount=%ld", 
