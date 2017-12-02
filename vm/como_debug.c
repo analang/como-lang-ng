@@ -25,24 +25,42 @@
 void como_warning_ex(const char *f, const char *fn, int ln, 
         const char* format, ...)
 {
-    fprintf(stderr, ANSI_COLOR_YELLOW "warning: %s:%s:%d: ", f, fn, ln);
+    if(isatty(2))
+        fprintf(stderr, ANSI_COLOR_YELLOW "warning: %s:%s:%d: ", f, fn, ln);
+    else
+        fprintf(stderr, "warning: %s:%s:%d: ", f, fn, ln);
+
     va_list args;
     va_start (args, format);
     vfprintf (stderr, format, args);
     va_end (args);
-    fprintf(stderr, ANSI_COLOR_RESET "\n");
+
+    if(isatty(2))
+        fprintf(stderr, ANSI_COLOR_RESET "\n");
+    else
+        fprintf(stderr, "\n");
+
     fflush(stderr); 
 }
 
 void como_debug_ex(const char *f, const char *fn, int ln, 
         const char* format, ...)
 {
-    fprintf(stderr, ANSI_COLOR_BLUE "debug: %s:%s:%d: ", f, fn, ln);
+    if(isatty(2))
+        fprintf(stderr, ANSI_COLOR_BLUE "debug: %s:%s:%d: ", f, fn, ln);
+    else
+        fprintf(stderr, ANSI_COLOR_BLUE "debug: %s:%s:%d: ", f, fn, ln);
+
     va_list args;
     va_start (args, format);
     vfprintf (stderr, format, args);
     va_end (args);
-    fprintf(stderr, ANSI_COLOR_RESET "\n");
+
+    if(isatty(2))
+        fprintf(stderr, ANSI_COLOR_RESET "\n");
+    else
+        fprintf(stderr, "\n");
+                    
     fflush(stderr);	
 }
 
