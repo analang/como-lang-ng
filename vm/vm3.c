@@ -252,7 +252,7 @@ if(!frameready)
       if(inter_total == 2)
         goto exit;
 
-      fprintf(stdout, "Keyboard interupt, type ctrl^c again to exit\n");
+      fprintf(stdout, "interrupt, press ^C again to terminate vm\n");
       inter = 0; 
       signal(SIGINT, sighandler);
     }
