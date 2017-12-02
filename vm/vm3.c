@@ -4,8 +4,6 @@
 #include <stdarg.h> 
 #include <signal.h>
 
-#define COMO_WARNING 1
-
 #include "como_debug.h"
 
 #include "../como_opcode.h"
@@ -248,12 +246,18 @@ if(!frameready)
   for(;;) {
     top:
     if(inter) {
+      // after the sig handler has been called, it's currently ignored
       inter_total++;
-      if(inter_total == 2)
-        goto exit;
 
-      fprintf(stdout, "interrupt, press ^C again to terminate vm\n");
+      if(inter_total == 2) {
+        inter = 0;
+        // at this point, the signal is still being ignored
+        goto exit;
+      }
+
+      fprintf(stdout, "\ncomo: interrupt, press ^C again to terminate vm\n");
       inter = 0; 
+      // install the signal handler again
       signal(SIGINT, sighandler);
     }
 
@@ -535,6 +539,8 @@ exit:
   ((como_object *)frame)->type->obj_deinit((como_object *)frame);
 
   do_gc(frame);
+
+  fflush(stdout);
 
   return retval; 
 }
