@@ -2,7 +2,11 @@
 #include <limits.h>
 #include <como.h>
 #include <stdarg.h> 
+#include <execinfo.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 #include "como_debug.h"
 
@@ -153,8 +157,8 @@ static char *make_except(const char *fmt, ...)
 
 static void sighandler(int sig)
 {
-  signal(SIGINT, SIG_IGN);
-  inter = 1;
+  signal(sig, SIG_IGN);
+  inter = sig;
 }
 
 #define int_const(frame, value) \
@@ -246,19 +250,37 @@ if(!frameready)
   for(;;) {
     top:
     if(inter) {
-      // after the sig handler has been called, it's currently ignored
-      inter_total++;
+      if(inter == SIGINT) {
+        // after the sig handler has been called, it's currently ignored
+        inter_total++;
 
-      if(inter_total == 2) {
-        inter = 0;
-        // at this point, the signal is still being ignored
-        goto exit;
+        if(inter_total == 2) {
+          // at this point, the signal is still being ignored
+          goto exit;
+        }
+
+        fprintf(stdout, "\ncomo: interrupt, press ^C again to terminate vm\n");
+        // install the signal handler again
+        signal(SIGINT, sighandler); 
+      } 
+      else if(inter == SIGSEGV)
+      {           
+        /* TODO, print the current opcode, and stack of the VM */
+        fprintf(stderr, "como: fatal, SIGSEGV caught, exiting with C backtrace\n");
+        int j, nptrs;
+        int SIZE = 1024;
+        void *buffer[SIZE];
+        char **strings;
+
+        nptrs = backtrace(buffer, SIZE);
+        strings = backtrace_symbols(buffer, nptrs);
+        
+        for (j = 0; j < nptrs; j++)
+          printf("%s\n", strings[j]);
+
+        abort();
       }
-
-      fprintf(stdout, "\ncomo: interrupt, press ^C again to terminate vm\n");
-      inter = 0; 
-      // install the signal handler again
-      signal(SIGINT, sighandler);
+      inter = 0;
     }
 
     /* Reset result */
@@ -658,10 +680,13 @@ int main(void)
     gc_new(frame, como_stringfromstring("add")), (
     gc_new(frame, (como_object *)addfunction)));
 
+
+
   #include "program.c"
 
   gc_on = 1;
   signal(SIGINT, sighandler);
+  signal(SIGSEGV, sighandler);
   como_object *retval = como_frame_eval(frame, 1);
 
   if(retval)
