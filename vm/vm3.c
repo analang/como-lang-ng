@@ -13,6 +13,10 @@
 #include "../como_opcode.h"
 
 
+#if !defined (HAVE_SIGHANDLER_T)
+typedef void(*sighandler_t)(int);
+#endif
+
 static int gc_on = 0;
 static int inter_total = 0;
 static volatile sig_atomic_t inter = 0;
@@ -266,7 +270,7 @@ if(!frameready)
       else if(inter == SIGSEGV)
       {           
         /* TODO, print the current opcode, and stack of the VM */
-        fprintf(stderr, "como: fatal, SIGSEGV caught, exiting with C backtrace\n");
+        fprintf(stderr, "como: fatal, SIGSEGV caught, exiting with C coredump\n");
         int j, nptrs;
         int SIZE = 1024;
         void *buffer[SIZE];
@@ -685,9 +689,16 @@ int main(void)
   #include "program.c"
 
   gc_on = 1;
-  signal(SIGINT, sighandler);
-  signal(SIGSEGV, sighandler);
+  /* setup the signal handlers for the VM */  
+  sighandler_t prev_sigint = signal(SIGINT, sighandler);
+  sighandler_t prev_sigsegv = signal(SIGSEGV, sighandler);
+
   como_object *retval = como_frame_eval(frame, 1);
+
+  /* reset them to original values */
+  signal(SIGINT, prev_sigint);
+  signal(SIGSEGV, prev_sigsegv);
+
 
   if(retval)
   {
