@@ -255,11 +255,13 @@ if(!frameready)
     top:
     if(inter) {
       if(inter == SIGINT) {
+        inter = 0;
+        /* Call user defined handlers here */
         // after the sig handler has been called, it's currently ignored
         inter_total++;
 
         if(inter_total == 2) {
-          // at this point, the signal is still being ignored
+          // at this point, the signal is still being ignored???
           goto exit;
         }
 
@@ -284,7 +286,6 @@ if(!frameready)
 
         abort();
       }
-      inter = 0;
     }
 
     /* Reset result */
@@ -626,6 +627,7 @@ static void do_gc(como_frame *frame)
 #else
   #define COUNT()
   #define SHOW_OBJS_LEFT()
+
 #endif
 
   como_warning("/// begin gc cycle for frame %s", ((como_string *)frame->name)->value);
@@ -677,6 +679,7 @@ int main(void)
   /* return $pop() + $pop(); */
   emit(addfunction, IADD,    0, 0);
   emit(addfunction, STORE_NAME, str_const(addfunction, "result"), 0);
+  /* infinite loop to test signal handling */
   emit(addfunction, JMP,     2, 0);
   emit(addfunction, IRETURN, 0, 1);
 
@@ -685,19 +688,28 @@ int main(void)
     gc_new(frame, (como_object *)addfunction)));
 
 
-
   #include "program.c"
 
   gc_on = 1;
+
   /* setup the signal handlers for the VM */  
   sighandler_t prev_sigint = signal(SIGINT, sighandler);
   sighandler_t prev_sigsegv = signal(SIGSEGV, sighandler);
 
+  (void)prev_sigsegv;
+  (void)prev_sigint;
+
   como_object *retval = como_frame_eval(frame, 1);
 
-  /* reset them to original values */
-  signal(SIGINT, prev_sigint);
-  signal(SIGSEGV, prev_sigsegv);
+  /* We want to do a property shutdown, so if SIGINT, is received
+   * after the vm has returned, it will still be ignored */
+
+/* If we ever got a SIGINT, then our handler will set it to SIG_IGN,
+ * and execution will return to main, else it will still be sighandler,
+ * test this by creating an infinite loop in como-lang, and press ^C
+ * this assertion should pass
+ */
+  assert(signal(SIGINT, sighandler) == SIG_IGN);
 
 
   if(retval)
