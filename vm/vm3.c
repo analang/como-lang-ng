@@ -527,6 +527,8 @@ if(!frameready)
               como_array_push(nativeargs, thearg);           
             }       
 
+            /* TODO, if builtins return NULL, an exception has occurred
+             *,therefore implement an API, to have the handler set the exception */
             res = gc_new(frame, fn->impl.handler(nativeargs));
 
             como_object_dtor(nativeargs);
@@ -594,7 +596,7 @@ exit:
 
   fflush(stdout);
 
-  return retval; 
+  return retval;
 }
 
 static void dump_locals(como_frame *frame)
@@ -756,16 +758,16 @@ int main(void)
   if(retval)
   {
     como_object *strval = retval->type->obj_str(retval);
-    fprintf(stdout, "%p $returnValue=%s\n", 
+    fprintf(stdout, "%p VM returned value of %s\n", 
       (void *)retval, ((como_string *)strval)->value);
     como_object_dtor(strval);
     decref(retval);
-    como_object_dtor(retval);
   }
 
   /* since this global frame is special, C needs to control this rather than the VM
      because the first frame isn't added to Como's Gc
   */
+  do_gc(frame);
   como_object_dtor(frame);
 
   return 0;
