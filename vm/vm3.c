@@ -7,10 +7,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include "como_debug.h"
 
-#include "../como_opcode.h"
+#include "como_opcode.h"
 
 #include "builtins.c"
 
@@ -24,6 +25,7 @@ static volatile sig_atomic_t inter = 0;
 
 static void do_gc(como_frame *frame);
 static void dump_locals(como_frame *frame);
+static void como_print_backtrace(como_frame *frame);
 
 #define should_grow(f) como_frame_growstack((como_object *)f)
 
@@ -575,6 +577,8 @@ if(!frameready)
       }
       fprintf(stdout, "como: fatal, unhandled exception: %s\n", ex);
       free(ex);
+      fprintf(stdout, "back trace:\n");
+      como_print_backtrace(frame);
       ex = NULL;
       goto exit;
     }
@@ -597,6 +601,18 @@ exit:
   fflush(stdout);
 
   return retval;
+}
+
+static void como_print_backtrace(como_frame *frame)
+{
+  como_frame *fm = frame;
+
+  while(fm != NULL)
+  {
+    fprintf(stdout, "  at %s\n", ((como_string *)fm->name)->value);
+
+    fm = (como_frame *)fm->parent;
+  }
 }
 
 static void dump_locals(como_frame *frame)
@@ -718,6 +734,7 @@ int main(void)
   emit(addframe, IADD,    0, 0);
   emit(addframe, STORE_NAME, str_const(addframe, "result"), 0);
   /* infinite loop to test signal handling */
+  emit(addframe, LOAD_NAME, str_const(addframe, "helloworld"), 0);
   emit(addframe, JMP,     2, 0);
   emit(addframe, IRETURN, 0, 1);
 
