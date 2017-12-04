@@ -12,6 +12,7 @@
 
 #include "../como_opcode.h"
 
+#include "builtins.c"
 
 #if !defined (HAVE_SIGHANDLER_T)
 typedef void(*sighandler_t)(int);
@@ -491,21 +492,45 @@ if(!frameready)
       }
       vm_target(CALL) {
         como_object *callable = pop();
-        if(como_type_is(callable, como_frame_type)) 
+
+        if(como_type_is(callable, como_function_type)) 
         {
           int totalargs = get_arg();
-          como_frame *function = (como_frame *)callable;
-          como_frame *oldframe = frame;
+          como_function *fn = como_get_function(callable);
+          como_object *res;
 
-          while(totalargs--)
+          if(fn->flags & COMO_FUNCTION_LANG) 
           {
-            como_object *thearg = pop();
-            frame = function;
-            push(thearg);
-            frame = oldframe;
-          }
+            como_frame *oldframe = frame;
 
-          como_object *res = como_frame_eval(function, 0);
+            /* setup the stack */
+            while(totalargs--)
+            {
+              como_object *thearg = pop();
+              frame = fn->impl.frame;
+              push(thearg);
+              frame = oldframe;
+            }
+
+            /* setup the caller */
+            fn->impl.frame->parent = (como_object *)frame;
+
+            res = como_frame_eval(fn->impl.frame, 0);
+          }
+          else
+          {
+            como_object *nativeargs = como_array_new(4);
+
+            while(totalargs--)
+            {
+              como_object *thearg = pop();
+              como_array_push(nativeargs, thearg);           
+            }       
+
+            res = gc_new(frame, fn->impl.handler(nativeargs));
+
+            como_object_dtor(nativeargs);
+          }
 
           if(res)
             push(res);
@@ -643,12 +668,23 @@ static void do_gc(como_frame *frame)
       como_warning("como_object_dtor(%p), refcount=%ld", 
         (void *)unreached, unreached->flags);
       como_object *next = unreached->next;
-      if(unreached->type == &como_frame_type ) {
+
+      if(unreached->type == &como_function_type) 
+      {
         // Since we can't define nested functions, this will only
         // happen on the global frame I think
-        como_warning("is frame type");
-        do_gc((como_frame *)unreached);
+        como_function *fn = como_get_function(unreached);
+
+        if(fn->flags & COMO_FUNCTION_LANG) 
+        {
+
+          do_gc(fn->impl.frame);
+
+          como_object_dtor(fn->impl.frame);
+        }
+
       }
+
       como_object_dtor(unreached);
       *root = next;
       frame->nobjs--;
@@ -673,20 +709,25 @@ int main(void)
 /* we need to init this to get access to the symbol table early (bootstrap)*/
   ((como_object *)frame)->type->obj_init((como_object *)frame);
 
-  como_frame *addfunction = (como_frame *)como_frame_new(
-    "add", (como_object *)frame);
-
+  como_frame *addframe = (como_frame *)como_frame_new("add", NULL);
+  como_object *addfn = como_functionfromframe(addframe);
+ 
   /* return $pop() + $pop(); */
-  emit(addfunction, IADD,    0, 0);
-  emit(addfunction, STORE_NAME, str_const(addfunction, "result"), 0);
+  emit(addframe, IADD,    0, 0);
+  emit(addframe, STORE_NAME, str_const(addframe, "result"), 0);
   /* infinite loop to test signal handling */
-  emit(addfunction, JMP,     2, 0);
-  emit(addfunction, IRETURN, 0, 1);
+  emit(addframe, JMP,     2, 0);
+  emit(addframe, IRETURN, 0, 1);
 
   como_map_put(frame->locals, 
-    gc_new(frame, como_stringfromstring("add")), (
-    gc_new(frame, (como_object *)addfunction)));
+    gc_new(frame, como_stringfromstring("add")), 
+    gc_new(frame, addfn)
+  );
 
+  como_map_put(frame->locals,
+    gc_new(frame, como_stringfromstring("readline")),
+    gc_new(frame, como_functionfromhandler(como__builtin_readline))
+  );
 
   #include "program.c"
 
@@ -709,7 +750,7 @@ int main(void)
  * test this by creating an infinite loop in como-lang, and press ^C
  * this assertion should pass
  */
-  assert(signal(SIGINT, sighandler) == SIG_IGN);
+  //assert(signal(SIGINT, sighandler) == SIG_IGN);
 
 
   if(retval)
