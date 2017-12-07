@@ -6,11 +6,14 @@
   #include "como_lexer.h"
 
 
-  int yyerror(ast_node **ast, yyscan_t scanner, const char* msg)
+  int yyerror(YYLTYPE *loc, ast_node **ast, 
+yyscan_t scanner, const char* msg)
   {
     (void)ast;
     (void)scanner;
-    fprintf(stderr, "como: error parsing: %s\n", msg);
+    fprintf(stderr, "como: syntax error: %s on line %d\n", 
+      msg, loc->first_line);
+
     return 1;
   }
 
@@ -40,7 +43,7 @@ typedef void* yyscan_t;
   long lval;
   double dval;
   char* id;
-  char* stringliteral;
+  char* stringliteral; 
   ast_node *ast;
 }
 
@@ -48,13 +51,29 @@ typedef void* yyscan_t;
 %token <dval> T_DOUBLE
 %token <id> T_ID
 %token <stringliteral> T_STR_LIT
-%token T_FUNCTION
-%token T_CLASS;
-%token T_PUBLIC
-%token T_PROTECTED
-%token T_PRIVATE
-%token T_NEW
-%token T_IMPORT
+
+%token keyword
+%token id
+%token stringliteral
+
+%token<keyword> T_FUNCTION "'function' keyword"
+%token T_CLASS "class"
+%token<keyword> T_PUBLIC "keyword 'public'"
+%token T_PROTECTED "protected"
+%token T_PRIVATE "private"
+%token T_NEW "new"
+%token T_IMPORT "import"
+
+%printer {
+  fprintf(yyoutput, "keyword '%s'", $$);
+} keyword
+
+%destructor {
+  fprintf(stdout, "Freeing id or string literal");
+} id stringliteral
+
+%token END 0 "EOF"
+
 
 %type<ast> function_statement function_statements function_def statements statement program constant primary_expression assignment_expression unary_expression optional_argument_list argument_list argument postfix_expression
 
@@ -68,6 +87,7 @@ typedef void* yyscan_t;
 %error-verbose
 %defines "como_parser.h"
 %pure-parser
+%locations
 
 %lex-param   { yyscan_t scanner }
 %parse-param { ast_node** ast   }

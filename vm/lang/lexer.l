@@ -10,7 +10,7 @@
 %option outfile="como_lexer.c" header-file="como_lexer.h"
 %option warn nodefault
 %option reentrant noyywrap never-interactive nounistd yylineno
-%option bison-bridge
+%option bison-bridge bison-locations
 %option nounput noinput
 
 WHITE_SPACE [ \r\n\t]*
@@ -27,6 +27,7 @@ D   [0-9]
 "private"   { return T_PRIVATE;   }
 "protected" { return T_PROTECTED; }
 "import"    { return T_IMPORT;    }
+"new" { return T_NEW; }
 
 {WHITE_SPACE} { /* Skipping Blanks Today */ }
 {L}{A}*         {
