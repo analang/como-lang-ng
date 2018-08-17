@@ -1,2 +1,0 @@
-result = typeof !0;
-assert(result == "int");

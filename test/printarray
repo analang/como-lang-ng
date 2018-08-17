@@ -1,7 +1,0 @@
-function printArray(value) {
-  print(value);
-}
-
-printArray([1,2,3,4,"String", [
-  "This is an element of an inner array"
-]]);

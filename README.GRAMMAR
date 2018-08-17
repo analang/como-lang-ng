@@ -1,6 +1,0 @@
-new grammar for calls (TODO):
-    /* At compile time, check that the node type of expr is not a literal 
-     * Note: see como_parser.y for the expr production
-     */
-    expr '(' optional_argument_list ')'
-    

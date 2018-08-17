@@ -1,5 +1,0 @@
-function isUndefined(name) {
-  return typeof _name;
-}
-
-print(isUndefined(1));
