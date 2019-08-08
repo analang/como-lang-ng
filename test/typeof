@@ -1,0 +1,15 @@
+/**
+ * evaluation order (typeof 1) == 1
+ * "int" == 1
+ * use typeof (1 == 1) to force precedence
+ */
+print(typeof 1 == 1);
+
+print(typeof(1==10));
+
+
+function fn() {
+
+}
+
+print(typeof fn);

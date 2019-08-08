@@ -1,0 +1,18 @@
+function name() {
+	/* Note that __FUNCTION__ is defined at compile time,
+     not runtime, so even if the function is proxied, it will
+     still return the real name 
+   */	
+	return __FUNCTION__;
+}
+
+func factory(callable) {
+	return callable();
+}
+
+name_proxy = name;
+
+
+/* name */
+print(factory(name_proxy));
+

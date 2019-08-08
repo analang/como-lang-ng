@@ -1,0 +1,1 @@
+print(typeof 1);

@@ -1,0 +1,8 @@
+func print_range(a, b) {
+	while(a <= b) {
+		print(a);
+		a++;
+	}
+}
+
+print_range(0, 10);

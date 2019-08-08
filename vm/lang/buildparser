@@ -1,0 +1,5 @@
+#!/bin/bash
+set -x
+bison -d grammar.y
+flex lexer.l
+gcc -Wall -Wextra grammar.tab.c como_lexer.c -o como
