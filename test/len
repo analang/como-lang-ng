@@ -1,1 +1,0 @@
-print(typeof len == "function");

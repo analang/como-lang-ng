@@ -1,4 +1,0 @@
-#!/bin/bash
-CMD="gcc -Wall -Wextra -std=c89 -O0 -g -ggdb ast.c -o main $@"
-echo $CMD
-`$CMD`
