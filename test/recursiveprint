@@ -1,0 +1,44 @@
+function recursive_print(value, indent) {
+  if(typeof value == "array") {
+    for(x = 0; x < indent; x++) {
+      write("  ");
+    }
+    print("["); 
+    for(i = 0; i < len(value); i++) {
+      recursive_print(value[i], indent + 1);
+    }
+    for(x = 0; x < indent; x++) {
+      write("  ");
+    }
+    print("]");
+  } else {
+    for(x = 0; x < indent; x++) {
+      write("  ");
+    }
+    if(typeof value == "string") {
+      write("'");
+      write(value);
+      write("'");
+    } else {
+      write(value);
+    }
+    print("");
+  } 
+}
+
+function pretty_print(object) {
+  recursive_print(object, 0);
+}
+
+names = [
+  "Bar",
+  [ 
+    10, 20, 30, 40, 50, 
+    [
+      "Hello", 
+      "World"
+    ]
+  ]
+];
+
+pretty_print(names);

@@ -1,0 +1,2 @@
+type = typeof typeof 1;
+assert(type == "string");
