@@ -1,0 +1,5 @@
+function getArray() { return [1,2,3,4]; }
+
+one = getArray()[0];
+
+assert(one == 1);

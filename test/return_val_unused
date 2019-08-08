@@ -1,0 +1,8 @@
+function fn()
+{
+    return __FUNCTION__;
+}
+
+fn();
+
+print(5 * 5);

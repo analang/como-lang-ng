@@ -1,0 +1,14 @@
+names = [
+  "Ryan",
+  "McCullagh",
+  "Hello",
+  "World"
+];
+
+function len(a) {
+  return 4;
+}
+
+for(i = 0; i < len(names); i++) {
+  print(names[i]);
+}

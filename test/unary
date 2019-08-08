@@ -1,0 +1,7 @@
+function unary(obj)
+{
+  return !obj;
+}
+
+assert(unary(0) == 1);
+assert(unary(1) == 0);

@@ -1,0 +1,10 @@
+function five() { a; }
+function four() { five(); }
+function three() { four(); }
+function two() { three(); }
+function one() { two(); }
+
+function init() { one(); }
+
+
+init();
